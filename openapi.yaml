@@ -1,0 +1,121 @@
+openapi: 3.0.3
+info:
+  title: CVExpert - Brecha de habilidades y cursos
+  version: 0.1.0
+  description: |
+    Borrador del contrato del microservicio. La API pública se expone
+    a través de Azure API Management (APIM).
+
+paths:
+  /skills-gap:
+    get:
+      tags:
+        - Brecha de habilidades
+      operationId: getSkillsGap
+      summary: Consultar brechas de habilidades y cursos sugeridos
+      description: |
+        Devuelve las brechas del usuario autenticado. APIM valida su
+        identidad y comunica X-User-Id al backend; el cliente no debe
+        seleccionar otro usuario mediante ese encabezado.
+      parameters:
+        - in: query
+          name: page
+          required: false
+          description: Número de página, comenzando en 1.
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: pageSize
+          required: false
+          description: Número máximo de brechas por página.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Brechas y recomendaciones obtenidas correctamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillsGapPage'
+              example:
+                items:
+                  - skillName: SQL
+                    userLevel: 40
+                    marketLevel: 80
+                    courses:
+                      - id: sql-101
+                        title: Curso introductorio de SQL
+                        url: https://example.org/courses/sql
+                        platform: Plataforma de ejemplo
+                        logoUrl: null
+                        durationHours: 8
+                page: 1
+                pageSize: 20
+                totalRecords: 1
+        '400':
+          description: Parámetros de paginación inválidos.
+        '401':
+          description: Solicitud no autenticada (validación en APIM).
+
+components:
+  schemas:
+    SkillsGapPage:
+      type: object
+      required: [items, page, pageSize, totalRecords]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillGapItem'
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+        totalRecords:
+          type: integer
+          minimum: 0
+
+    SkillGapItem:
+      type: object
+      required: [skillName, userLevel, marketLevel, courses]
+      properties:
+        skillName:
+          type: string
+        userLevel:
+          type: integer
+          description: Nivel del usuario; escala aún por acordar con el equipo.
+        marketLevel:
+          type: integer
+          description: Nivel de mercado; escala aún por acordar con el equipo.
+        courses:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseSuggestion'
+
+    CourseSuggestion:
+      type: object
+      required: [id, title, url, platform, logoUrl, durationHours]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+          format: uri
+        platform:
+          type: string
+        logoUrl:
+          type: string
+          format: uri
+          nullable: true
+        durationHours:
+          type: integer
+          minimum: 0
