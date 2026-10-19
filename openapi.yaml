@@ -17,11 +17,15 @@ paths:
         Devuelve las brechas del usuario autenticado. APIM valida su
         identidad y comunica X-User-Id al backend; el cliente no debe
         seleccionar otro usuario mediante ese encabezado.
+        La primera versión solo devuelve datos ficticios etiquetados [DEMO],
+        sin autenticación ni recomendaciones reales. Solo está habilitada con
+        NODE_ENV=development o test; en cualquier otro entorno devuelve 503.
+        Los niveles ilustrativos no establecen una escala definitiva.
       parameters:
         - in: query
           name: page
           required: false
-          description: Número de página, comenzando en 1.
+          description: Entero positivo seguro en base 10, comenzando en 1. Una página fuera de rango devuelve items vacío.
           schema:
             type: integer
             minimum: 1
@@ -29,7 +33,7 @@ paths:
         - in: query
           name: pageSize
           required: false
-          description: Número máximo de brechas por página.
+          description: Número máximo de brechas por página. Entero en base 10; no acepta decimales, signos, espacios, notación exponencial ni valores múltiples.
           schema:
             type: integer
             minimum: 1
@@ -37,21 +41,31 @@ paths:
             default: 20
       responses:
         '200':
-          description: Brechas y recomendaciones obtenidas correctamente.
+          description: Datos ficticios de demostración; no son recomendaciones reales.
+          headers:
+            X-Data-Mode:
+              description: Identifica explícitamente el origen ficticio de los datos.
+              schema:
+                type: string
+                enum: [demo]
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SkillsGapPage'
               example:
                 items:
-                  - skillName: SQL
+                  - skillName: '[DEMO] SQL'
                     userLevel: 40
                     marketLevel: 80
                     courses:
-                      - id: sql-101
-                        title: Curso introductorio de SQL
-                        url: https://example.org/courses/sql
-                        platform: Plataforma de ejemplo
+                      - id: demo-course-1
+                        title: '[DEMO] Curso ficticio de SQL'
+                        url: https://example.org/demo/courses/1
+                        platform: Plataforma ficticia de demostración
                         logoUrl: null
                         durationHours: 8
                 page: 1
@@ -61,6 +75,8 @@ paths:
           description: Parámetros de paginación inválidos.
         '401':
           description: Solicitud no autenticada (validación en APIM).
+        '503':
+          description: Funcionalidad no disponible; los datos demo están bloqueados fuera de development y test.
 
 components:
   schemas:
