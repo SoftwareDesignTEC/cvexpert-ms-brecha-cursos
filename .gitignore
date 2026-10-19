@@ -1,0 +1,14 @@
+
+# Dependencias
+node_modules/
+
+# Archivos generados
+dist/
+coverage/
+
+# Configuración local y secretos
+.env
+.env.*
+!.env.example
+
+.vscode/

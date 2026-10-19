@@ -1,0 +1,34 @@
+{
+  "name": "cvexpert-ms-brecha-cursos",
+  "version": "1.0.0",
+  "description": "Microservicio de brecha de habilidades y recomendación de cursos de CVExpert",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SoftwareDesignTEC/cvexpert-ms-brecha-cursos.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/SoftwareDesignTEC/cvexpert-ms-brecha-cursos/issues"
+  },
+  "homepage": "https://github.com/SoftwareDesignTEC/cvexpert-ms-brecha-cursos#readme",
+  "dependencies": {
+    "dotenv": "^18.0.8",
+    "express": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
