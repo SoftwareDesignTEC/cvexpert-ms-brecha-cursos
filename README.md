@@ -55,6 +55,103 @@ esta versión no valida identidades ni utiliza `X-User-Id`.
 No se han implementado Azure ni Service Bus. El catálogo PostgreSQL descrito
 abajo es independiente del endpoint demo: `/skills-gap` no consulta la base.
 
+## Borrador de contrato del catálogo — pendiente de aprobación
+
+`openapi.yaml` distingue el comportamiento disponible del diseño propuesto.
+Según el contexto confirmado del proyecto, Fase I ya contempla cursos sugeridos
+en `/skills-gap` y el documento de responsabilidades también exige documentar
+el catálogo. No se encontraron esos documentos fuente en este repositorio;
+no se atribuyen aquí otros requisitos a ellos.
+
+| Contrato o capacidad | Estado comprobado |
+| --- | --- |
+| `GET /health` | Implementado; este borrador OpenAPI no lo describe. |
+| `GET /skills-gap` y cursos sugeridos | Implementado solo con datos demo en development/test; bloqueado en otros entornos. |
+| `page` y `pageSize` en `/skills-gap` | Implementados; nombres, valores predeterminados, límites y esquemas existentes se conservan. |
+| Catálogo PostgreSQL | Esquema, migraciones y seed opcional implementados; no conectado a un endpoint de catálogo. |
+| `GET /courses`, filtros y esquemas `CoursesPage`/`CatalogCourse` | Propuesta no implementada, pendiente de aprobación del equipo. |
+| Recomendaciones personalizadas reales e integración de identidad/APIM | No implementadas. No se introduce una política nueva de autenticación. |
+
+La web y Android continúan consumiendo `/skills-gap`. Documentar `/courses`
+no exige otra llamada para obtener sus recomendaciones ni sustituye el arreglo
+`courses` de cada brecha. No se crean endpoints administrativos ni contratos
+con otros microservicios. Los ejemplos del nuevo contrato son ficticios y no
+constituyen una prueba de que la ruta funcione.
+
+### Consulta propuesta
+
+`GET /courses` consultaría el catálogo general, sin seleccionar un usuario.
+Se propone conservar el sobre `items`, `page`, `pageSize`, `totalRecords`, con
+valores predeterminados 1 y 20 y máximo `pageSize=100`. El total cuenta cursos
+únicos después de filtrar y antes de paginar. No se repite un curso por cada
+habilidad asociada. Una consulta sin coincidencias o una página fuera de rango
+devuelve, en la propuesta, HTTP 200 con `items: []` y el total correspondiente.
+
+Se propone ordenar por ID SQL ascendente, como entero. Ordenar las cadenas
+públicas pondría por ejemplo `"10"` antes de `"2"`. La paginación por página no
+garantiza una instantánea si el catálogo cambia entre solicitudes. No se añade
+un parámetro de orden configurable ni paginación por cursor en este borrador.
+
+| Filtro opcional propuesto | Respaldo en el modelo | Semántica propuesta |
+| --- | --- | --- |
+| `platform` | `courses.platform` | Coincidencia exacta sensible a mayúsculas, sin recortar o normalizar el valor. |
+| `isPaid` | `courses.is_paid` | Literal `true` o `false`; omitirlo incluye ambos. |
+| `skillName` | `skills.name` y `course_skills` | Una habilidad por nombre exacto sensible a mayúsculas. No requiere otro endpoint para resolver IDs. |
+
+Los filtros se combinan con AND. Se propone rechazar con HTTP 400 parámetros
+reconocidos repetidos, objetos, arreglos, vacíos o solo espacios; en paginación
+tampoco se aceptan signos, decimales, notación exponencial o números inseguros.
+Los parámetros desconocidos se ignoran, siguiendo el comportamiento existente
+de `/skills-gap`. El formato de error queda pendiente; se propone además 503
+para indisponibilidad temporal de la futura consulta. Son respuestas diseñadas,
+no respuestas verificadas de `/courses`.
+
+Estos filtros son opciones de diseño respaldadas por las tablas, no requisitos
+confirmados de web o Android. No se proponen filtros de usuario, afinidad,
+nivel de mercado, idioma, puntuación o precio: no tienen respaldo en este modelo.
+
+### Curso de catálogo y curso sugerido
+
+Se mantienen esquemas independientes, evitando extender `CourseSuggestion`
+mediante `allOf`: ese esquema no permite la duración desconocida del catálogo.
+No se modifica ningún tipo TypeScript de la API durante esta tarea.
+
+| Campo | `CourseSuggestion` existente | `CatalogCourse` propuesto |
+| --- | --- | --- |
+| `id` | Cadena, sin exigir formato decimal; los IDs demo actuales siguen válidos. | Cadena opaca para clientes; se propone `String(courses.id)`, pendiente de aprobación. |
+| `title`, `url`, `platform` | Obligatorios. | Obligatorios, mapeados a las columnas homónimas. |
+| `logoUrl` | Obligatorio, nullable. | Obligatorio, nullable; procede de `logo_url`. |
+| `durationHours` | Obligatorio, entero no nullable. | Obligatorio, entero nullable; procede de `duration_hours`. |
+| `isPaid` | No forma parte del esquema actual. | Booleano obligatorio, procede de `is_paid`. |
+| `skills` | No forma parte del esquema actual. | Arreglo obligatorio de nombres de habilidades, sin duplicados; admite `[]`. |
+
+Convertir un ID SQL a cadena no genera una identidad nueva ni ofrece secreto
+o autorización. Se propone que los clientes lo almacenen sin interpretarlo;
+no se cambia la PK ni se impone un formato nuevo sobre `/skills-gap`.
+
+En el catálogo, `null` conserva el significado de duración desconocida.
+No se debe inventar una duración, sustituirla por cero ni enviar null en
+`CourseSuggestion`: rompería el contrato que consumen web y Android.
+La integración futura de recomendaciones deberá esperar una política acordada
+para cursos sin duración, o una evolución explícita del contrato con clientes.
+
+### Decisiones para consultar al equipo
+
+1. ¿Se aprueban los filtros propuestos y su coincidencia exacta, o existe una
+   necesidad confirmada de búsqueda parcial o normalización?
+2. ¿Se aprueba la cadena decimal como ID público, y cómo se coordinará la
+   identidad de cursos entre catálogo y recomendaciones futuras?
+3. ¿Se aprueban `durationHours: null` y los campos `isPaid`/`skills` en el catálogo?
+4. ¿Qué política tendrá `/skills-gap` ante cursos persistidos sin duración,
+   manteniendo compatible el contrato actual de web y Android?
+5. ¿Qué política de acceso al catálogo y qué formato de error se acordarán?
+   La ausencia de `security` en el borrador no aprueba acceso anónimo.
+6. ¿Se aprueban el orden, los límites, las reglas de filtros combinados y los
+   estados HTTP propuestos antes de implementar la ruta?
+
+Todas las reglas nuevas de `/courses` requieren revisión del equipo. Su presencia
+en OpenAPI sirve para discutir el diseño, no para declararlas requisitos aprobados.
+
 ## PostgreSQL local — Etapa A
 
 Requisitos adicionales: Docker Engine o Docker Desktop con contenedores Linux
@@ -222,7 +319,9 @@ tipo cadena (`string`). No es correcto devolver directamente una fila SQL como
 respuesta HTTP ni convertir una duración desconocida en cero arbitrariamente.
 Antes de conectar el catálogo a la API debemos acordar con el equipo la
 nulabilidad, la representación de IDs y el mapeo entre ambos modelos. Esta
-etapa no cambia OpenAPI ni los modelos de la API y no decide esa conversión.
+etapa de PostgreSQL no modificó los esquemas existentes de la API. El borrador
+de `/courses` propone un mapeo independiente, todavía sin aprobar; no modifica
+`CourseSuggestion` ni los modelos TypeScript implementados.
 
 ### Migraciones y datos de demostración
 
