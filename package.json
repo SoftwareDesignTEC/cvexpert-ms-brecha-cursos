@@ -5,6 +5,10 @@
   "main": "index.js",
   "scripts": {
     "test": "node --import tsx --test test/*.test.ts",
+    "db:migrate": "tsx src/db/cli.ts migrate",
+    "db:seed": "tsx src/db/cli.ts seed",
+    "db:check": "tsx src/db/cli.ts check",
+    "db:test": "node --import tsx --test test/db/*.test.ts",
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js"
@@ -23,11 +27,13 @@
   "homepage": "https://github.com/SoftwareDesignTEC/cvexpert-ms-brecha-cursos#readme",
   "dependencies": {
     "dotenv": "^18.0.8",
-    "express": "^5.3.0"
+    "express": "^5.3.0",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
