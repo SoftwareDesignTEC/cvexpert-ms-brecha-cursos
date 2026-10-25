@@ -1,0 +1,210 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-cd-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    name: Classify paths
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.paths.outputs.run }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - name: Test workflow guards
+        run: node --test .github/scripts/*.test.mjs
+      - name: Classify changes (unknown paths run CI)
+        id: paths
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node .github/scripts/ci-paths.mjs
+
+  test:
+    name: Node 24 / PostgreSQL 17
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGDATABASE: cvexpert_ci
+      PGUSER: cvexpert_ci
+      # Public, disposable test credential. Never use it outside this service.
+      PGPASSWORD: ci-only-disposable-password
+      DB_SSL_MODE: disable
+      PGSSLROOTCERT: ''
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_DB: cvexpert_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-bootstrap-disposable-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cvexpert_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - name: Create disposable test role with LOGIN and CREATEDB only
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: >-
+          docker exec "$POSTGRES_CONTAINER" psql -U postgres -d cvexpert_ci
+          -v ON_ERROR_STOP=1 -c "CREATE ROLE cvexpert_ci LOGIN NOSUPERUSER NOCREATEROLE CREATEDB PASSWORD 'ci-only-disposable-password';"
+      # The helper can only create/drop its own disposable databases.
+      - run: npm run db:test
+      - name: Retain tested build only for enabled main deployment
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.ENABLE_AZURE_DEPLOY == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: node-build-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
+
+  ci:
+    name: CI
+    needs: [changes, test]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require tests or an explicitly documentation-only PR
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          RUN_TESTS: ${{ needs.changes.outputs.run }}
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          test "$CHANGES_RESULT" = success
+          if [ "$RUN_TESTS" = false ]; then
+            test "$TEST_RESULT" = skipped
+            echo 'Documentation-only PR; workflow guard tests passed.'
+          else
+            test "$RUN_TESTS" = true
+            test "$TEST_RESULT" = success
+          fi
+
+  package:
+    name: Package tested main build
+    needs: [ci, test]
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      vars.ENABLE_AZURE_DEPLOY == 'true' && needs.ci.result == 'success' && needs.test.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: node-build-${{ github.sha }}
+          path: ${{ runner.temp }}/release/dist
+      - name: Package production dependencies (no env files, seeds or SQL)
+        env:
+          RELEASE_DIR: ${{ runner.temp }}/release
+        run: |
+          cp package.json package-lock.json "$RELEASE_DIR/"
+          npm ci --omit=dev --ignore-scripts --prefix "$RELEASE_DIR"
+          cd "$RELEASE_DIR"
+          zip -q -r "$GITHUB_WORKSPACE/app.zip" dist node_modules package.json package-lock.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: app-${{ github.sha }}
+          path: app.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: Azure OIDC (disabled by default)
+    needs: [ci, package]
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      vars.ENABLE_AZURE_DEPLOY == 'true' && needs.ci.result == 'success' && needs.package.result == 'success'
+    # Configure a dedicated trusted runner with access to the private SCM endpoint.
+    runs-on: ${{ vars.AZURE_DEPLOY_RUNNER || 'ubuntu-24.04' }}
+    environment: azure-production
+    timeout-minutes: 20
+    concurrency:
+      group: azure-production-cvexpert-ms-brecha-cursos
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_DEPLOY_RUNNER: ${{ vars.AZURE_DEPLOY_RUNNER }}
+      AZURE_CORE_OUTPUT: none
+      AZURE_WEBAPP_NAME: cvexpert-ms-brecha-cursos
+      AZURE_RESOURCE_GROUP: rg-cvexpert
+    steps:
+      - name: Require explicit environment configuration
+        run: |
+          test -n "$AZURE_DEPLOY_RUNNER"
+          test -n "$AZURE_CLIENT_ID"
+          test -n "$AZURE_TENANT_ID"
+          test -n "$AZURE_SUBSCRIPTION_ID"
+          printf 'AZURE_CONFIG_DIR=%s/azure-oidc-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: app-${{ github.sha }}
+          path: ${{ runner.temp }}/deployment
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Read-only safety checks (private backend, runtime and separate identity)
+        run: node .github/scripts/azure-preflight.mjs
+      - name: Deploy package with Entra token (no publish profile)
+        env:
+          PACKAGE: ${{ runner.temp }}/deployment/app.zip
+        run: |
+          az webapp deploy --resource-group "$AZURE_RESOURCE_GROUP" --name "$AZURE_WEBAPP_NAME" \
+            --src-path "$PACKAGE" --type zip --restart true --only-show-errors --output none

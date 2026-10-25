@@ -375,3 +375,131 @@ Pendientes: revisión del modelo con el equipo, endpoint `GET /courses`, políti
 de URLs y nombres, roles de mínimo privilegio, respaldo/restauración, credenciales
 administradas y validación TLS remota. Las pruebas normales (`npm test`) no
 necesitan PostgreSQL; las de integración (`npm run db:test`) sí lo necesitan.
+
+## CI/CD con GitHub Actions
+
+El workflow `.github/workflows/ci-cd.yml` ejecuta CI para PR cuyo destino sea
+`develop` o `main`, y para pushes a `main`. Las acciones oficiales están fijadas
+por SHA de commit. No usa `pull_request_target`, publish profiles ni credenciales
+de Azure para validar contribuciones.
+
+### CI: Node 24 y PostgreSQL 17 desechable
+
+En Ubuntu 24.04, con Node.js 24, el job ejecuta en orden:
+
+```sh
+npm ci
+npm run build
+npm test
+npm run db:test
+```
+
+PostgreSQL 17 se crea como service container, sin volumen persistente, con
+credenciales públicas exclusivamente de prueba y `PGHOST=127.0.0.1`, puerto
+5432, `NODE_ENV=test` y TLS desactivado solo para esta conexión local.
+El usuario bootstrap `postgres`, exclusivo de ese contenedor, crea un rol de
+pruebas distinto con LOGIN y CREATEDB, sin SUPERUSER ni CREATEROLE.
+Las pruebas crean y eliminan únicamente sus bases
+`cvexpert_test_<UUID>`; el contenedor completo desaparece al terminar el job.
+No se usa `.env`, Key Vault ni Azure PostgreSQL, no se ejecuta el seed y no se
+llama a `db:migrate` sobre ninguna base compartida o de producción.
+
+El filtro de rutas está dentro del workflow, no en `on.paths`, para no dejar un
+check requerido pendiente en PR de documentación. Solo omite el job Node/PG
+cuando TODOS los archivos modificados son `README.md` o Markdown bajo `docs/`.
+Cambios de código, tests, SQL, dependencias, `.github`, OpenAPI, configuraciones
+y cualquier ruta desconocida ejecutan la suite. Los renombrados consideran tanto
+la ruta antigua como la nueva. Incluso un PR solo documental prueba los guards.
+Un push a `main` siempre ejecuta CI completo, independientemente de las rutas.
+
+El job final **CI** siempre se evalúa y falla si fallaron la clasificación o las
+pruebas requeridas. Configurar ese check como obligatorio en las reglas de
+protección de `develop` y `main`; el workflow no modifica esas reglas. Requerir
+también revisión de cambios en `.github/`. Los runs anteriores del mismo PR se
+cancelan; un despliegue en ejecución no se cancela por un push posterior.
+
+Para probar localmente los guards sin Azure ni PostgreSQL:
+
+```sh
+node --test .github/scripts/*.test.mjs
+```
+
+### CD: preparado, desactivado por defecto
+
+No se ha desplegado a Azure como parte de esta implementación. El destino está
+fijado a App Service Linux `cvexpert-ms-brecha-cursos` en `rg-cvexpert`.
+Solo un push a `main`, después de CI exitoso para ese mismo commit y con la
+variable de repositorio `ENABLE_AZURE_DEPLOY` exactamente igual a `true`, puede
+empaquetar e iniciar el job de despliegue. Ausente o con cualquier otro valor,
+CD permanece desactivado. No hay disparador manual ni despliegue desde PR,
+`develop` o `workflow_run` de otro workflow.
+
+Se empaqueta el `dist` que pasó las pruebas junto a `package.json`, el lockfile
+y dependencias de producción instaladas con `npm ci --omit=dev --ignore-scripts`.
+El ZIP tiene los archivos en su raíz y no incluye `.env`, fuentes, archivos SQL, datos de seed,
+tests o credenciales locales. La instalación sin scripts sirve para las
+dependencias actuales; si se agregan dependencias que compilan código nativo,
+habrá que revisar este paso y su compatibilidad con el runtime de App Service.
+Los artefactos duran un día y se consumen en el mismo run, identificados por SHA.
+No se ejecutan migraciones, seeds o pruebas de base de datos en el job Azure.
+
+El job usa `azure/login` con OIDC y `az webapp deploy` con autenticación Entra;
+no genera ni descarga credenciales de publicación. Solo ese job recibe
+`id-token: write`; los demás tienen únicamente `contents: read`. El token OIDC
+es efímero. La autenticación GitHub-Azure no lee secretos de Key Vault.
+
+### Preparación administrativa pendiente (no automatizada)
+
+1. Crear una aplicación de Entra/service principal **exclusiva para despliegue**.
+   No reutilizar la identidad administrada de la aplicación que consume Key Vault.
+   Conceder, como punto de partida, Website Contributor limitado al recurso
+   App Service, no a la suscripción ni a todo `rg-cvexpert`. Revisar si un rol
+   personalizado puede reducirlo más. No conceder permisos de lectura de secretos
+   de Key Vault a esta identidad de despliegue.
+2. Configurar su federación con issuer `https://token.actions.githubusercontent.com`,
+   audience `api://AzureADTokenExchange` y subject
+   `repo:SoftwareDesignTEC/cvexpert-ms-brecha-cursos:environment:azure-production`.
+   Al usar un environment el subject no es `ref:refs/heads/main`: la restricción
+   de rama se configura además en GitHub y ya se verifica en el workflow.
+3. Crear el environment GitHub `azure-production`, permitir despliegue solamente
+   desde `main` y exigir revisión/aprobación del equipo (según capacidades del plan).
+   Mantener las protecciones de rama y del environment; el YAML no las crea.
+4. Registrar las variables no secretas `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` y
+   `AZURE_SUBSCRIPTION_ID` en ese environment. Son identificadores, no client
+   secrets. Mantener por separado los secretos reales de runtime en Key Vault,
+   accesibles solo mediante la identidad administrada y sus referencias existentes.
+5. Proveer un runner Linux dedicado y confiable con acceso al endpoint SCM privado,
+   Node 24 compatible y Azure CLI; registrar su label en la variable **de repositorio**
+   `AZURE_DEPLOY_RUNNER`. Nunca usar ese runner para PR no confiables. Sin label,
+   el job falla antes de iniciar sesión; no intenta abrir firewalls para desplegar.
+6. Revisar y preparar la conectividad privada de App Service/SCM y APIM, DNS y
+   certificados. El preflight exige `publicNetworkAccess=Disabled`, HTTPS y TLS
+   >=1.2 tanto en la aplicación como en SCM. No basta `clientCertMode=Required`:
+   App Service reenvía certificados y el código actual no los valida. Esta
+   implementación no abre acceso público ni implementa validación de certificados
+   o integración APIM; una alternativa pública restringida requerirá otro diseño
+   y aprobación. Un runner hospedado estándar no alcanza un SCM solo privado.
+7. Preparar en App Service `NODE|24-lts`, comando de arranque `npm start` o
+   `node dist/server.js`, `NODE_ENV=production`, y las opciones
+   `SCM_DO_BUILD_DURING_DEPLOYMENT=false` y `ENABLE_ORYX_BUILD=false`.
+   Deshabilitar publicación básica tanto en SCM como FTP. El workflow consulta
+   y verifica estas opciones; no modifica configuración, red, roles o identidades.
+8. El preflight compara el `oid` del principal autenticado con los principal IDs
+   de las identidades administradas asignadas al App Service y rechaza reutilizarlas.
+   La lectura del token queda en memoria, sin imprimirlo ni guardarlo. Confirmar
+   además administrativamente que el principal de despliegue no tiene permisos
+   heredados sobre Key Vault.
+9. Solo después de revisar estos puntos, habilitar `ENABLE_AZURE_DEPLOY=true`
+   a nivel de repositorio y promover cambios a `main` mediante PR. Los workflows
+   deben estar presentes en `main` para que un push a esa rama active el proceso.
+   Este PR hacia `develop` por sí solo no despliega.
+
+La seguridad del acceso y la verificación funcional a través de APIM quedan
+pendientes. El preflight falla cerrado si falta alguna condición; no hace un
+smoke test anónimo contra el backend ni transforma un despliegue en aprobación
+de sus endpoints de negocio. `/skills-gap` sigue bloqueado en producción mientras
+solo existan recomendaciones demo; `/courses` continúa sin implementarse.
+
+Referencias: [PostgreSQL en Actions](https://docs.github.com/en/actions/tutorials/use-containerized-services/create-postgresql-service-containers),
+[OIDC y mínimo alcance en App Service](https://learn.microsoft.com/en-us/azure/app-service/deploy-github-actions),
+[certificados cliente en App Service](https://learn.microsoft.com/en-us/azure/app-service/app-service-web-configure-tls-mutual-auth).
