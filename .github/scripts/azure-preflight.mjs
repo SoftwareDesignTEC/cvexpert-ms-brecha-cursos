@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Configuration guards only: not proof of APIM connectivity, mTLS or application health.
 export function validateDeployment({ site, config, settings, scmBasicAuth, ftpBasicAuth, deploymentObjectId }) {
     const require = (condition, message) => { if (!condition) throw new Error(message); };
     require(site.name === 'cvexpert-ms-brecha-cursos' && site.resourceGroup?.toLowerCase() === 'rg-cvexpert',
@@ -58,7 +59,7 @@ function main() {
         throw new Error('Unable to inspect the authenticated deployment principal.');
     }
     validateDeployment({ site, config, settings, scmBasicAuth: policy('scm'), ftpBasicAuth: policy('ftp'), deploymentObjectId: oid });
-    console.log('Azure preflight passed; network and identities were not modified.');
+    console.log('Azure configuration guards passed; APIM connectivity, certificate validation and live functionality remain unverified.');
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

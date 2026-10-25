@@ -10,7 +10,7 @@ export function requiresCi(paths) {
 }
 
 export function classifyChanges(eventName, base, head) {
-    // A release always executes the full suite, even when only docs changed.
+    // All pushes (develop and main) execute the full suite, even for docs-only changes.
     if (eventName !== 'pull_request') return true;
     if (![base, head].every(sha => /^[a-f0-9]{40}$/.test(sha ?? ''))) {
         throw new Error('Missing or invalid PR revisions; refusing to skip CI.');

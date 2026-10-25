@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [develop, main]
   push:
-    branches: [main]
+    branches: [develop, main]
 
 permissions:
   contents: read
@@ -28,6 +28,8 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24'
+      - name: Validate workflows with pinned actionlint and checksum
+        run: bash .github/scripts/actionlint.sh
       - name: Test workflow guards
         run: node --test .github/scripts/*.test.mjs
       - name: Classify changes (unknown paths run CI)
@@ -77,6 +79,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - name: Block high and critical vulnerabilities (including dev dependencies)
+        run: npm audit --audit-level=high
       - run: npm run build
       - run: npm test
       - name: Create disposable test role with LOGIN and CREATEDB only
@@ -87,8 +91,7 @@ jobs:
           -v ON_ERROR_STOP=1 -c "CREATE ROLE cvexpert_ci LOGIN NOSUPERUSER NOCREATEROLE CREATEDB PASSWORD 'ci-only-disposable-password';"
       # The helper can only create/drop its own disposable databases.
       - run: npm run db:test
-      - name: Retain tested build only for enabled main deployment
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.ENABLE_AZURE_DEPLOY == 'true'
+      - name: Retain tested build for ZIP verification
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: node-build-${{ github.sha }}
@@ -98,7 +101,7 @@ jobs:
 
   ci:
     name: CI
-    needs: [changes, test]
+    needs: [changes, test, package]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 2
@@ -108,22 +111,22 @@ jobs:
           CHANGES_RESULT: ${{ needs.changes.result }}
           RUN_TESTS: ${{ needs.changes.outputs.run }}
           TEST_RESULT: ${{ needs.test.result }}
+          PACKAGE_RESULT: ${{ needs.package.result }}
         run: |
           test "$CHANGES_RESULT" = success
           if [ "$RUN_TESTS" = false ]; then
             test "$TEST_RESULT" = skipped
+            test "$PACKAGE_RESULT" = skipped
             echo 'Documentation-only PR; workflow guard tests passed.'
           else
             test "$RUN_TESTS" = true
             test "$TEST_RESULT" = success
+            test "$PACKAGE_RESULT" = success
           fi
 
   package:
-    name: Package tested main build
-    needs: [ci, test]
-    if: >-
-      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-      vars.ENABLE_AZURE_DEPLOY == 'true' && needs.ci.result == 'success' && needs.test.result == 'success'
+    name: Verify production ZIP (no deployment)
+    needs: test
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -138,18 +141,13 @@ jobs:
         with:
           name: node-build-${{ github.sha }}
           path: ${{ runner.temp }}/release/dist
-      - name: Package production dependencies (no env files, seeds or SQL)
-        env:
-          RELEASE_DIR: ${{ runner.temp }}/release
-        run: |
-          cp package.json package-lock.json "$RELEASE_DIR/"
-          npm ci --omit=dev --ignore-scripts --prefix "$RELEASE_DIR"
-          cd "$RELEASE_DIR"
-          zip -q -r "$GITHUB_WORKSPACE/app.zip" dist node_modules package.json package-lock.json
+      - name: Build ZIP and boot its extracted production server
+        run: bash .github/scripts/package-app.sh "$RUNNER_TEMP/app.zip"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.ENABLE_AZURE_DEPLOY == 'true'
         with:
           name: app-${{ github.sha }}
-          path: app.zip
+          path: ${{ runner.temp }}/app.zip
           if-no-files-found: error
           retention-days: 1
 
