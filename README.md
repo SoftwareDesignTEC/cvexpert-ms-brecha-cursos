@@ -375,3 +375,194 @@ Pendientes: revisión del modelo con el equipo, endpoint `GET /courses`, políti
 de URLs y nombres, roles de mínimo privilegio, respaldo/restauración, credenciales
 administradas y validación TLS remota. Las pruebas normales (`npm test`) no
 necesitan PostgreSQL; las de integración (`npm run db:test`) sí lo necesitan.
+
+## CI/CD con GitHub Actions
+
+El workflow `.github/workflows/ci-cd.yml` ejecuta CI para PR cuyo destino sea
+`develop` o `main`, y para pushes a `develop` y `main`. Las acciones oficiales están fijadas
+por SHA de commit. No usa `pull_request_target`, publish profiles ni credenciales
+de Azure para validar contribuciones.
+
+### CI: Node 24 y PostgreSQL 17 desechable
+
+En Ubuntu 24.04, con Node.js 24, el job ejecuta en orden:
+
+```sh
+npm ci
+npm audit --audit-level=high
+npm run build
+npm test
+npm run db:test
+```
+
+PostgreSQL 17 se crea como service container, sin volumen persistente, con
+credenciales públicas exclusivamente de prueba y `PGHOST=127.0.0.1`, puerto
+5432, `NODE_ENV=test` y TLS desactivado solo para esta conexión local.
+El usuario bootstrap `postgres`, exclusivo de ese contenedor, crea un rol de
+pruebas distinto con LOGIN y CREATEDB, sin SUPERUSER ni CREATEROLE.
+Las pruebas crean y eliminan únicamente sus bases
+`cvexpert_test_<UUID>`; el contenedor completo desaparece al terminar el job.
+No se usa `.env`, Key Vault ni Azure PostgreSQL, no se ejecuta el seed y no se
+llama a `db:migrate` sobre ninguna base compartida o de producción.
+
+El filtro de rutas está dentro del workflow, no en `on.paths`, para no dejar un
+check requerido pendiente en PR de documentación. Solo omite el job Node/PG
+cuando TODOS los archivos modificados son `README.md` o Markdown bajo `docs/`.
+Cambios de código, tests, SQL, dependencias, `.github`, OpenAPI, configuraciones
+y cualquier ruta desconocida ejecutan la suite. Los renombrados consideran tanto
+la ruta antigua como la nueva. Incluso un PR solo documental prueba los guards.
+Los pushes a `develop` y `main` siempre ejecutan CI completo, independientemente
+de las rutas, incluida la comprobación del ZIP de producción.
+
+El job final **CI** siempre se evalúa y falla si fallaron la clasificación o las
+pruebas requeridas o la comprobación del paquete de producción. Configurar ese check como obligatorio en las reglas de
+protección de `develop` y `main`; el workflow no modifica esas reglas. Requerir
+también revisión de cambios en `.github/`. Los runs anteriores del mismo PR se
+cancelan; un despliegue en ejecución no se cancela por un push posterior.
+
+Para probar localmente los guards sin Azure ni PostgreSQL:
+
+```sh
+node --test .github/scripts/*.test.mjs
+```
+
+El job de clasificación también valida los workflows con `actionlint` 1.7.12,
+descargado de la release oficial y comprobado contra un SHA-256 fijo en
+`.github/scripts/actionlint.sh`. No ejecuta un instalador `latest`. Esta
+validación y los tests de guards se ejecutan también en PR solo documentales.
+
+La auditoría npm incluye dependencias de desarrollo y bloquea CI ante severidad
+alta o crítica; no hay `continue-on-error`, excepciones de avisos ni arreglos
+forzados. Un fallo del servicio de auditoría tampoco se convierte en éxito.
+La revisión de GHSA-27r3-jxmh-p828 actualizó el lockfile de `body-parser` 2.3.0
+a 2.4.0, compatible con `express@5.3.0` y su rango `^2.3.0`. No se añadieron
+dependencias directas, overrides o cambios mayores. Para auditar solo runtime:
+
+```sh
+npm audit --omit=dev
+```
+
+### Comprobación del ZIP sin desplegar
+
+Después de las pruebas, el job `Verify production ZIP (no deployment)` descarga
+el compilado del mismo run y ejecuta `.github/scripts/package-app.sh`. Construye
+el ZIP desde una lista permitida, no desde todo el workspace, y elimina de la
+copia los CLI compilados de migraciones y seeds. El verificador
+`verify-package.mjs` comprueba las rutas del ZIP, la presencia de `dist/server.js`,
+`dist/app.js`, manifiestos y dependencias de producción; rechaza `.env`, SQL,
+directorios de migraciones/seeds, los CLI administrativos, archivos de claves,
+credenciales con nombres conocidos y rutas que intenten salir del directorio.
+Los tests negativos comprueban que esas entradas sean rechazadas.
+
+Luego extrae ese mismo ZIP en un directorio temporal y ejecuta el servidor
+compilado real con `NODE_ENV=production` y un puerto local temporal, sin heredar
+variables PG, Azure o tokens GitHub. Exige `/health=200` con su JSON exacto y
+`/skills-gap=503`. Cierra el proceso y elimina únicamente los archivos temporales.
+La verificación forma parte del check obligatorio CI; no necesita OIDC o Azure.
+El filtrado de archivos no es un detector exhaustivo de secretos incrustados en
+código: sigue siendo necesario revisar que no se versionen credenciales.
+
+### CD: preparado, desactivado por defecto
+
+No se ha desplegado a Azure como parte de esta implementación. El destino está
+fijado a App Service Linux `cvexpert-ms-brecha-cursos` en `rg-cvexpert`.
+Solo un push a `main`, después de CI exitoso para ese mismo commit y con la
+variable de repositorio `ENABLE_AZURE_DEPLOY` exactamente igual a `true`, puede
+publicar el artefacto destinado a Azure e iniciar el job de despliegue. Ausente o con cualquier otro valor,
+CD permanece desactivado. No hay disparador manual ni despliegue desde PR,
+`develop` o `workflow_run` de otro workflow.
+
+Se empaqueta el `dist` que pasó las pruebas junto a `package.json`, el lockfile
+y dependencias de producción instaladas con `npm ci --omit=dev --ignore-scripts`.
+El ZIP tiene los archivos en su raíz y no incluye `.env`, fuentes, archivos SQL, datos de seed,
+tests o credenciales locales. La instalación sin scripts sirve para las
+dependencias actuales; si se agregan dependencias que compilan código nativo,
+habrá que revisar este paso y su compatibilidad con el runtime de App Service.
+Los artefactos duran un día y se consumen en el mismo run, identificados por SHA.
+No se ejecutan migraciones, seeds o pruebas de base de datos en el job Azure.
+La creación y comprobación local del ZIP sí ocurre en los PR de código y pushes
+a ambas ramas, aunque el despliegue esté desactivado.
+
+El job usa `azure/login` con OIDC y `az webapp deploy` con autenticación Entra;
+no genera ni descarga credenciales de publicación. Solo ese job recibe
+`id-token: write`; los demás tienen únicamente `contents: read`. El token OIDC
+es efímero. La autenticación GitHub-Azure no lee secretos de Key Vault.
+
+### Preparación administrativa pendiente (no automatizada)
+
+1. Crear una aplicación de Entra/service principal **exclusiva para despliegue**.
+   No reutilizar la identidad administrada de la aplicación que consume Key Vault.
+   Conceder, como punto de partida, Website Contributor limitado al recurso
+   App Service, no a la suscripción ni a todo `rg-cvexpert`. Revisar si un rol
+   personalizado puede reducirlo más. No conceder permisos de lectura de secretos
+   de Key Vault a esta identidad de despliegue.
+2. Configurar su federación con issuer `https://token.actions.githubusercontent.com`,
+   audience `api://AzureADTokenExchange` y subject
+   `repo:SoftwareDesignTEC/cvexpert-ms-brecha-cursos:environment:azure-production`.
+   Al usar un environment el subject no es `ref:refs/heads/main`: la restricción
+   de rama se configura además en GitHub y ya se verifica en el workflow.
+3. Crear el environment GitHub `azure-production`, permitir despliegue solamente
+   desde `main` y exigir revisión/aprobación del equipo (según capacidades del plan).
+   Mantener las protecciones de rama y del environment; el YAML no las crea.
+4. Registrar las variables no secretas `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` y
+   `AZURE_SUBSCRIPTION_ID` en ese environment. Son identificadores, no client
+   secrets. Mantener por separado los secretos reales de runtime en Key Vault,
+   accesibles solo mediante la identidad administrada y sus referencias existentes.
+5. Proveer un runner Linux dedicado y confiable con acceso al endpoint SCM privado,
+   Node 24 compatible y Azure CLI; registrar su label en la variable **de repositorio**
+   `AZURE_DEPLOY_RUNNER`. Nunca usar ese runner para PR no confiables. Sin label,
+   el job falla antes de iniciar sesión; no intenta abrir firewalls para desplegar.
+6. Revisar y preparar la conectividad privada de App Service/SCM y APIM, DNS y
+   certificados. El preflight exige `publicNetworkAccess=Disabled`, HTTPS y TLS
+   >=1.2 tanto en la aplicación como en SCM. No basta `clientCertMode=Required`:
+   App Service reenvía certificados y el código actual no los valida. Esta
+   implementación no abre acceso público ni implementa validación de certificados
+   o integración APIM; una alternativa pública restringida requerirá otro diseño
+   y aprobación. Un runner hospedado estándar no alcanza un SCM solo privado.
+7. Preparar en App Service `NODE|24-lts`, comando de arranque `npm start` o
+   `node dist/server.js`, `NODE_ENV=production`, y las opciones
+   `SCM_DO_BUILD_DURING_DEPLOYMENT=false` y `ENABLE_ORYX_BUILD=false`.
+   Deshabilitar publicación básica tanto en SCM como FTP. El workflow consulta
+   y verifica estas opciones; no modifica configuración, red, roles o identidades.
+8. El preflight compara el `oid` del principal autenticado con los principal IDs
+   de las identidades administradas asignadas al App Service y rechaza reutilizarlas.
+   La lectura del token queda en memoria, sin imprimirlo ni guardarlo. Confirmar
+   además administrativamente que el principal de despliegue no tiene permisos
+   heredados sobre Key Vault.
+9. Solo después de revisar estos puntos, habilitar `ENABLE_AZURE_DEPLOY=true`
+   a nivel de repositorio y promover cambios a `main` mediante PR. Los workflows
+   deben estar presentes en `main` para que un push a esa rama active el proceso.
+   Este PR hacia `develop` por sí solo no despliega.
+
+La seguridad del acceso y la verificación funcional a través de APIM quedan
+pendientes. El preflight falla cerrado si falta alguna condición; no hace un
+smoke test anónimo contra el backend ni transforma un despliegue en aprobación
+de sus endpoints de negocio. `/skills-gap` sigue bloqueado en producción mientras
+solo existan recomendaciones demo; `/courses` continúa sin implementarse.
+
+### Alcance limitado del preflight Azure
+
+El preflight es una consulta de **configuración de control plane**, no una prueba
+de APIM, mTLS ni salud funcional de la aplicación desplegada. No realiza ni
+modifica conexiones a Azure PostgreSQL, red, identidades o datos de negocio.
+Sus condiciones se mantienen sin relajarlas para permitir un despliegue.
+
+Quedan sin comprobar y requieren validación independiente antes de habilitar CD:
+
+- Certificados: cadena de confianza, vigencia, revocación y validación efectiva
+  del certificado cliente y su identidad. Leer opciones HTTPS/TLS o exigir red
+  privada no demuestra mTLS; el código actual no valida certificados cliente.
+- Conectividad APIM-backend: DNS privado, rutas, reglas de acceso y negociación
+  TLS desde APIM hacia el backend real.
+- Funcionamiento desplegado: arranque efectivo, health check a través del camino
+  autorizado y comportamiento de las operaciones reales. El smoke test del ZIP
+  solo demuestra arranque local del paquete, no la integración con Azure/APIM.
+- Autorización: comparar principal IDs evita reutilizar la identidad administrada,
+  pero no demuestra ausencia de privilegios excesivos o heredados sobre Key Vault.
+
+Un preflight exitoso no sustituye estas pruebas ni constituye aprobación para
+abrir el backend o activar el despliegue.
+
+Referencias: [PostgreSQL en Actions](https://docs.github.com/en/actions/tutorials/use-containerized-services/create-postgresql-service-containers),
+[OIDC y mínimo alcance en App Service](https://learn.microsoft.com/en-us/azure/app-service/deploy-github-actions),
+[certificados cliente en App Service](https://learn.microsoft.com/en-us/azure/app-service/app-service-web-configure-tls-mutual-auth).
