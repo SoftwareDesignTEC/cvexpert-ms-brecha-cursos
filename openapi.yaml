@@ -7,9 +7,10 @@ info:
     API Management (APIM) es una intención de diseño, no una integración implementada.
     GET /skills-gap está implementado únicamente en modo demostración y conserva
     su contrato consumido por web y Android, incluidos los cursos sugeridos.
-    GET /courses y sus esquemas de catálogo son PROPUESTAS NO IMPLEMENTADAS,
-    pendientes de aprobación del equipo. Documentarlos no habilita el endpoint
-    ni confirma necesidades nuevas de los clientes o una política de autenticación.
+    GET /courses está implementado con PostgreSQL conforme al borrador de catálogo.
+    Sus decisiones contractuales siguen pendientes de ratificación del equipo
+    antes de fusionar el PR; implementarlo no aprueba una política de acceso
+    ni implica desplegarlo o confirmar necesidades nuevas de web o Android.
 
 paths:
   /health:
@@ -114,10 +115,11 @@ paths:
       tags:
         - Catálogo de cursos
       operationId: getCourses
-      summary: '[PROPUESTA NO IMPLEMENTADA] Consultar el catálogo de cursos'
-      x-implementation-status: proposed-not-implemented
+      summary: Consultar el catálogo de cursos
+      x-implementation-status: implemented-pending-contract-ratification
       description: |
-        Propuesta pendiente de aprobación del equipo; todavía no existe esta ruta.
+        Implementado conforme a la propuesta, pendiente de ratificación del equipo
+        antes de fusionar el PR. No implica despliegue ni aprobación de acceso público.
         Consulta general del catálogo persistente, sin personalización ni cálculo
         de brechas. Las recomendaciones siguen formando parte de /skills-gap.
         No exige que web o Android migren ni hagan una consulta adicional.
@@ -133,7 +135,12 @@ paths:
         la paginación por página no garantiza una instantánea entre peticiones.
         Los parámetros reconocidos aceptan un único valor; valores repetidos,
         arreglos, objetos, textos vacíos o solo espacios son inválidos.
+        También se rechaza el byte NUL, no representable en text de PostgreSQL.
         Los parámetros desconocidos se ignoran, como en /skills-gap.
+        Los errores JSON implementados contienen error y message; este formato
+        y los demás acuerdos del borrador requieren ratificación antes de fusionar.
+        El conteo y los items se obtienen en una única sentencia de solo lectura,
+        con la misma instantánea de PostgreSQL para cada respuesta.
 
         Acceso y autenticación del catálogo pendientes de acuerdo. La ausencia
         de security en este borrador no constituye aprobación de acceso anónimo.
@@ -226,15 +233,29 @@ paths:
                     pageSize: 20
                     totalRecords: 1
         '400':
-          description: 'Propuesta: parámetros de paginación o filtros inválidos; formato del cuerpo de error pendiente de acuerdo.'
+          description: Parámetros de paginación o filtros inválidos. Formato implementado pendiente de ratificación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogError'
+              example:
+                error: INVALID_QUERY
+                message: Parámetros de consulta inválidos.
         '503':
-          description: 'Propuesta: catálogo temporalmente no disponible; no describe la respuesta actual de una ruta todavía inexistente.'
+          description: Catálogo temporalmente no disponible; sin detalles internos de PostgreSQL o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogError'
+              example:
+                error: CATALOG_UNAVAILABLE
+                message: El catálogo no está disponible temporalmente.
 
 components:
   schemas:
     CoursesPage:
       type: object
-      description: Propuesta no implementada de página del catálogo; independiente de SkillsGapPage.
+      description: Página del catálogo implementada conforme al borrador, pendiente de ratificación; independiente de SkillsGapPage.
       required: [items, page, pageSize, totalRecords]
       properties:
         items:
@@ -258,7 +279,7 @@ components:
     CatalogCourse:
       type: object
       description: |
-        Propuesta no implementada de curso del catálogo, independiente de
+        Curso del catálogo implementado conforme al borrador, pendiente de ratificación; independiente de
         CourseSuggestion. Añade isPaid y skills; permite durationHours null.
         No representa afinidad con un usuario ni una recomendación.
       required: [id, title, url, platform, logoUrl, durationHours, isPaid, skills]
@@ -305,6 +326,17 @@ components:
             Se propone un arreglo vacío si el curso no tiene habilidades asociadas.
           items:
             type: string
+
+    CatalogError:
+      type: object
+      description: Formato de error del catálogo implementado, pendiente de ratificación. No modifica errores de otros endpoints.
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          enum: [INVALID_QUERY, CATALOG_UNAVAILABLE]
+        message:
+          type: string
 
     SkillsGapPage:
       type: object

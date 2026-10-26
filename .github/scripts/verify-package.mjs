@@ -63,6 +63,12 @@ async function smokeTest(directory) {
         assert.deepEqual(await response.json(), { status: 'ok', service: 'brecha-cursos' });
         const demo = await fetch(`http://127.0.0.1:${port}/skills-gap`, { signal: AbortSignal.timeout(1000) });
         assert.equal(demo.status, 503, 'Production must not publish demo recommendations.');
+        // The package must start without PG configuration; requesting the catalog
+        // fails safely and must not make health unavailable.
+        const courses = await fetch(`http://127.0.0.1:${port}/courses`, { signal: AbortSignal.timeout(1000) });
+        assert.equal(courses.status, 503);
+        assert.equal((await courses.json()).error, 'CATALOG_UNAVAILABLE');
+        assert.equal((await fetch(`http://127.0.0.1:${port}/health`)).status, 200);
     } finally {
         child.kill('SIGTERM');
         await Promise.race([closed, setTimeout(2000, undefined, { ref: false })]);
