@@ -7,6 +7,18 @@ const app = createApp();
 const port = Number(process.env.PORT ?? 3000);
 
 //Iniciar el servidor HTTP
-app.listen(port, '0.0.0.0', () => {
+const server = app.listen(port, '0.0.0.0', () => {
     console.log(`Servidor escuchando en puerto ${port}`);
 });
+
+// Deja terminar las peticiones antes de cerrar el pool, si llegó a crearse.
+function shutdown() {
+    server.close(() => {
+        void app.closeResources().catch(() => {
+            console.error('No se pudieron cerrar los recursos del servidor.');
+            process.exitCode = 1;
+        });
+    });
+}
+process.once('SIGTERM', shutdown);
+process.once('SIGINT', shutdown);

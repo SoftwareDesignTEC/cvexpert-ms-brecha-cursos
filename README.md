@@ -55,7 +55,7 @@ esta versión no valida identidades ni utiliza `X-User-Id`.
 No se han implementado Azure ni Service Bus. El catálogo PostgreSQL descrito
 abajo es independiente del endpoint demo: `/skills-gap` no consulta la base.
 
-## Borrador de contrato del catálogo — pendiente de aprobación
+## Contrato del catálogo — implementado, pendiente de ratificación
 
 `openapi.yaml` distingue el comportamiento disponible del diseño propuesto.
 Según el contexto confirmado del proyecto, Fase I ya contempla cursos sugeridos
@@ -65,11 +65,11 @@ no se atribuyen aquí otros requisitos a ellos.
 
 | Contrato o capacidad | Estado comprobado |
 | --- | --- |
-| `GET /health` | Implementado; este borrador OpenAPI no lo describe. |
+| `GET /health` | Implementado y documentado en OpenAPI. |
 | `GET /skills-gap` y cursos sugeridos | Implementado solo con datos demo en development/test; bloqueado en otros entornos. |
 | `page` y `pageSize` en `/skills-gap` | Implementados; nombres, valores predeterminados, límites y esquemas existentes se conservan. |
-| Catálogo PostgreSQL | Esquema, migraciones y seed opcional implementados; no conectado a un endpoint de catálogo. |
-| `GET /courses`, filtros y esquemas `CoursesPage`/`CatalogCourse` | Propuesta no implementada, pendiente de aprobación del equipo. |
+| Catálogo PostgreSQL | Esquema, migraciones y seed opcional implementados; consultado por `/courses`. |
+| `GET /courses`, filtros y esquemas `CoursesPage`/`CatalogCourse` | Implementados conforme al borrador; sus decisiones contractuales requieren ratificación del equipo antes de fusionar el PR. No desplegado a Azure. |
 | Recomendaciones personalizadas reales e integración de identidad/APIM | No implementadas. No se introduce una política nueva de autenticación. |
 
 La web y Android continúan consumiendo `/skills-gap`. Documentar `/courses`
@@ -78,9 +78,9 @@ no exige otra llamada para obtener sus recomendaciones ni sustituye el arreglo
 con otros microservicios. Los ejemplos del nuevo contrato son ficticios y no
 constituyen una prueba de que la ruta funcione.
 
-### Consulta propuesta
+### Consulta implementada conforme al borrador
 
-`GET /courses` consultaría el catálogo general, sin seleccionar un usuario.
+`GET /courses` consulta el catálogo general, sin seleccionar un usuario.
 Se propone conservar el sobre `items`, `page`, `pageSize`, `totalRecords`, con
 valores predeterminados 1 y 20 y máximo `pageSize=100`. El total cuenta cursos
 únicos después de filtrar y antes de paginar. No se repite un curso por cada
@@ -102,9 +102,13 @@ Los filtros se combinan con AND. Se propone rechazar con HTTP 400 parámetros
 reconocidos repetidos, objetos, arreglos, vacíos o solo espacios; en paginación
 tampoco se aceptan signos, decimales, notación exponencial o números inseguros.
 Los parámetros desconocidos se ignoran, siguiendo el comportamiento existente
-de `/skills-gap`. El formato de error queda pendiente; se propone además 503
-para indisponibilidad temporal de la futura consulta. Son respuestas diseñadas,
-no respuestas verificadas de `/courses`.
+de `/skills-gap`. También se rechaza NUL, no representable en `text` de PostgreSQL.
+Los errores implementados son 400 con `{ "error": "INVALID_QUERY", "message":
+"Parámetros de consulta inválidos." }` y 503 con `{ "error": "CATALOG_UNAVAILABLE",
+"message": "El catálogo no está disponible temporalmente." }`. Estos cuerpos
+concretan una parte no definida del borrador y requieren ratificación. No se
+exponen consultas, mensajes del driver, hosts ni contraseñas. Las respuestas de
+`/courses` llevan `Cache-Control: no-store`.
 
 Estos filtros son opciones de diseño respaldadas por las tablas, no requisitos
 confirmados de web o Android. No se proponen filtros de usuario, afinidad,
@@ -114,7 +118,8 @@ nivel de mercado, idioma, puntuación o precio: no tienen respaldo en este model
 
 Se mantienen esquemas independientes, evitando extender `CourseSuggestion`
 mediante `allOf`: ese esquema no permite la duración desconocida del catálogo.
-No se modifica ningún tipo TypeScript de la API durante esta tarea.
+Los tipos y esquemas existentes de `/skills-gap` no cambian. Los nuevos modelos
+de catálogo están separados en `src/models/courses.ts`.
 
 | Campo | `CourseSuggestion` existente | `CatalogCourse` propuesto |
 | --- | --- | --- |
@@ -144,19 +149,89 @@ para cursos sin duración, o una evolución explícita del contrato con clientes
 3. ¿Se aprueban `durationHours: null` y los campos `isPaid`/`skills` en el catálogo?
 4. ¿Qué política tendrá `/skills-gap` ante cursos persistidos sin duración,
    manteniendo compatible el contrato actual de web y Android?
-5. ¿Qué política de acceso al catálogo y qué formato de error se acordarán?
+5. ¿Qué política de acceso al catálogo se acordará y se ratifican los cuerpos
+   JSON 400/503 implementados y el rechazo de NUL?
    La ausencia de `security` en el borrador no aprueba acceso anónimo.
 6. ¿Se aprueban el orden, los límites, las reglas de filtros combinados y los
    estados HTTP propuestos antes de implementar la ruta?
 
-Todas las reglas nuevas de `/courses` requieren revisión del equipo. Su presencia
-en OpenAPI sirve para discutir el diseño, no para declararlas requisitos aprobados.
+Todas las reglas nuevas de `/courses` requieren ratificación antes de fusionar.
+Implementarlas y documentarlas no las convierte en requisitos aprobados ni
+autoriza acceso público, autenticación nueva o despliegue.
+
+### Organización y consistencia de la consulta
+
+- `routes/courses.routes.ts`: registra solo `GET /courses`.
+- `controllers/courses.controller.ts`: valida los parámetros originales de la
+  URL, incluidos repetidos y claves con corchetes que un parser podría omitir.
+  Los desconocidos se ignoran. No se recortan valores para alterar coincidencias.
+- `services/courses.service.ts`: adapta filas SQL al modelo público, convirtiendo
+  IDs a cadenas y conservando los NULL de logo y duración.
+- `repositories/courses.repository.ts`: contiene una sentencia SQL fija con
+  parámetros para todos los valores del cliente, incluido LIMIT/OFFSET.
+
+La consulta usa un CTE filtrado y `EXISTS` para habilidades: cada curso aparece
+una vez. El arreglo de habilidades contiene todas las del curso, aunque el
+filtro seleccione una de ellas. Conteo y página salen del mismo SELECT y ven
+la misma instantánea, sin necesitar transacciones de escritura o permisos
+administrativos. El offset se calcula con `BigInt`, se envía como texto decimal
+y PostgreSQL lo recibe como `bigint`. Se aceptan páginas hasta el máximo entero
+seguro de JavaScript; incluso su offset con tamaño 100 cabe en bigint SQL.
+Una página enorme válida devuelve un arreglo vacío con el total real, sin
+redondeos ni multiplicaciones inseguras. El conteo exacto requiere recorrer el
+conjunto filtrado: evaluar planes y tiempos si el catálogo crece sustancialmente.
+
+El repositorio crea el pool solo ante una consulta válida de `/courses`. Iniciar
+Express, `/health` y `/skills-gap` no requieren PostgreSQL. Configuración inválida
+o base caída producen 503 solo en el catálogo, sin recurrir a datos ficticios.
+Al recibir SIGTERM/SIGINT, el servidor deja terminar peticiones y cierra el pool.
+No se llaman otros microservicios; los clientes transportan la información que
+corresponda entre dominios. Cálculo real de brechas y Service Bus siguen fuera
+de este PR.
+
+### Uso local y permisos de aplicación
+
+Usar un dueño local para migraciones/seed y `cvexpert_brecha_app` para HTTP.
+No ejecutar migraciones con el usuario de aplicación. Sobre PostgreSQL local,
+un administrador puede crear el rol si todavía no existe, asignarle una
+contraseña local mediante `\password cvexpert_brecha_app` en psql y conceder:
+
+```sql
+CREATE ROLE cvexpert_brecha_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
+GRANT CONNECT ON DATABASE cvexpert_catalog TO cvexpert_brecha_app;
+GRANT USAGE ON SCHEMA public TO cvexpert_brecha_app;
+GRANT SELECT ON public.courses, public.skills, public.course_skills TO cvexpert_brecha_app;
+```
+
+Son instrucciones para desarrollo local, no un script ejecutado por HTTP o
+una instrucción para modificar Azure. Si el rol existe, revisar sus permisos;
+no recrearlo. Para arrancar la app en otra terminal, configurar las variables
+existentes con `PGUSER=cvexpert_brecha_app` y su contraseña local. Las variables
+del proceso tienen prioridad sobre `.env`; no versionar contraseñas. Mantener
+TLS verificado donde ya sea obligatorio; el modo sin TLS del PostgreSQL de
+pruebas local no se extiende a producción.
+
+Ejemplo de consulta local (no requiere agregar autenticación nueva):
+
+```sh
+curl 'http://127.0.0.1:3000/courses?page=1&pageSize=20&isPaid=false'
+```
+
+Para una demostración **local opcional**, usar el mecanismo separado ya existente:
+con cuenta dueña, `NODE_ENV=development`, `PGHOST=127.0.0.1` y base local,
+ejecutar `npm run db:migrate` y luego `npm run db:seed`. Después consultar con
+la cuenta SELECT. El seed usa `[DEMO]`, plataforma ficticia y `example.org`,
+es repetible y no se ejecuta automáticamente al arrancar ni en CI/producción.
+No ejecutarlo con credenciales o contra una base Azure. Los fixtures `[TEST]`
+de pruebas son diferentes y solo existen en bases desechables; ningún registro
+de demostración o prueba representa recomendaciones reales de `/skills-gap`.
 
 ## PostgreSQL local — Etapa A
 
 Requisitos adicionales: Docker Engine o Docker Desktop con contenedores Linux
 y Docker Compose. No hace falta instalar PostgreSQL en el host.
-Esta etapa no implementa `GET /courses` ni cambia el contrato HTTP existente.
+La etapa de infraestructura precedió a `/courses`, implementado ahora según el
+borrador sin cambiar el contrato de `/skills-gap`.
 
 ### Preparación y variables
 
@@ -206,6 +281,11 @@ npm run db:test
 cursos con sus habilidades. Si falta migrar, falla con código de salida 1.
 `db:test` requiere PostgreSQL local en loopback, `NODE_ENV=development` o `test`
 y un usuario con permiso `CREATEDB` (el usuario del Compose local lo tiene).
+Las pruebas HTTP del catálogo requieren además el rol local `cvexpert_brecha_app`
+sin privilegios administrativos y `PG_READONLY_PASSWORD` con su contraseña solo
+para estas pruebas. Cada base aislada concede únicamente USAGE de schema y SELECT
+en las tres tablas a ese rol. En CI, ambos roles se crean en el contenedor
+desechable con contraseñas ficticias exclusivas de prueba; nunca en Azure.
 Se conecta a la base administrativa `postgres` para crear bases vacías con
 `TEMPLATE template0`, nombradas `cvexpert_test_<UUID>`. Nunca usa `PGDATABASE`
 como destino de las pruebas ni modifica sus tablas o secuencias.
@@ -371,7 +451,7 @@ integridad referencial, unicidad y transacciones. SQLite simplificaría el arran
 pero no verificaría el motor PostgreSQL solicitado; un almacén documental haría
 menos directa la integridad de estas asociaciones.
 
-Pendientes: revisión del modelo con el equipo, endpoint `GET /courses`, política
+Pendientes: ratificación del contrato `/courses` con el equipo, política
 de URLs y nombres, roles de mínimo privilegio, respaldo/restauración, credenciales
 administradas y validación TLS remota. Las pruebas normales (`npm test`) no
 necesitan PostgreSQL; las de integración (`npm run db:test`) sí lo necesitan.
@@ -399,7 +479,9 @@ PostgreSQL 17 se crea como service container, sin volumen persistente, con
 credenciales públicas exclusivamente de prueba y `PGHOST=127.0.0.1`, puerto
 5432, `NODE_ENV=test` y TLS desactivado solo para esta conexión local.
 El usuario bootstrap `postgres`, exclusivo de ese contenedor, crea un rol de
-pruebas distinto con LOGIN y CREATEDB, sin SUPERUSER ni CREATEROLE.
+pruebas distinto con LOGIN y CREATEDB, sin SUPERUSER ni CREATEROLE. Crea también
+`cvexpert_brecha_app` sin CREATEDB, SUPERUSER o CREATEROLE para probar SELECT
+y la denegación efectiva de escrituras. No se añaden privilegios al rol HTTP.
 Las pruebas crean y eliminan únicamente sus bases
 `cvexpert_test_<UUID>`; el contenedor completo desaparece al terminar el job.
 No se usa `.env`, Key Vault ni Azure PostgreSQL, no se ejecuta el seed y no se
@@ -457,7 +539,8 @@ Los tests negativos comprueban que esas entradas sean rechazadas.
 Luego extrae ese mismo ZIP en un directorio temporal y ejecuta el servidor
 compilado real con `NODE_ENV=production` y un puerto local temporal, sin heredar
 variables PG, Azure o tokens GitHub. Exige `/health=200` con su JSON exacto y
-`/skills-gap=503`. Cierra el proceso y elimina únicamente los archivos temporales.
+`/skills-gap=503` y `/courses=503` sin configuración PostgreSQL, manteniendo
+`/health=200`. Cierra el proceso y elimina únicamente los archivos temporales.
 La verificación forma parte del check obligatorio CI; no necesita OIDC o Azure.
 El filtrado de archivos no es un detector exhaustivo de secretos incrustados en
 código: sigue siendo necesario revisar que no se versionen credenciales.
@@ -538,7 +621,8 @@ La seguridad del acceso y la verificación funcional a través de APIM quedan
 pendientes. El preflight falla cerrado si falta alguna condición; no hace un
 smoke test anónimo contra el backend ni transforma un despliegue en aprobación
 de sus endpoints de negocio. `/skills-gap` sigue bloqueado en producción mientras
-solo existan recomendaciones demo; `/courses` continúa sin implementarse.
+solo existan recomendaciones demo; `/courses` está implementado pero no se
+despliega ni se conecta a Azure como parte de este PR.
 
 ### Alcance limitado del preflight Azure
 
