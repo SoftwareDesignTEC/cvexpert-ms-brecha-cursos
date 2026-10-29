@@ -1,0 +1,395 @@
+openapi: 3.0.3
+info:
+  title: CVExpert - Brecha de habilidades y cursos
+  version: 0.1.0
+  description: |
+    Borrador del contrato del microservicio. La exposición mediante Azure
+    API Management (APIM) es una intención de diseño, no una integración implementada.
+    GET /skills-gap está implementado únicamente en modo demostración y conserva
+    su contrato consumido por web y Android, incluidos los cursos sugeridos.
+    GET /courses está implementado con PostgreSQL conforme al borrador de catálogo.
+    Sus decisiones contractuales siguen pendientes de ratificación del equipo
+    antes de fusionar el PR; implementarlo no aprueba una política de acceso
+    ni implica desplegarlo o confirmar necesidades nuevas de web o Android.
+
+paths:
+  /health:
+    get:
+      tags:
+        - Salud del servicio
+      operationId: getHealth
+      summary: Consultar el estado del servicio
+      description: Endpoint implementado; devuelve el estado y el nombre del servicio.
+      responses:
+        '200':
+          description: El servicio responde correctamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [status, service]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  service:
+                    type: string
+                    enum: [brecha-cursos]
+              example:
+                status: ok
+                service: brecha-cursos
+  /skills-gap:
+    get:
+      tags:
+        - Brecha de habilidades
+      operationId: getSkillsGap
+      summary: Consultar brechas de habilidades y cursos sugeridos
+      description: |
+        Devuelve las brechas del usuario autenticado. APIM valida su
+        identidad y comunica X-User-Id al backend; el cliente no debe
+        seleccionar otro usuario mediante ese encabezado.
+        La primera versión solo devuelve datos ficticios etiquetados [DEMO],
+        sin autenticación ni recomendaciones reales. Solo está habilitada con
+        NODE_ENV=development o test; en cualquier otro entorno devuelve 503.
+        Los niveles ilustrativos no establecen una escala definitiva.
+      parameters:
+        - in: query
+          name: page
+          required: false
+          description: Entero positivo seguro en base 10, comenzando en 1. Una página fuera de rango devuelve items vacío.
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: pageSize
+          required: false
+          description: Número máximo de brechas por página. Entero en base 10; no acepta decimales, signos, espacios, notación exponencial ni valores múltiples.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Datos ficticios de demostración; no son recomendaciones reales.
+          headers:
+            X-Data-Mode:
+              description: Identifica explícitamente el origen ficticio de los datos.
+              schema:
+                type: string
+                enum: [demo]
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillsGapPage'
+              example:
+                items:
+                  - skillName: '[DEMO] SQL'
+                    userLevel: 40
+                    marketLevel: 80
+                    courses:
+                      - id: demo-course-1
+                        title: '[DEMO] Curso ficticio de SQL'
+                        url: https://example.org/demo/courses/1
+                        platform: Plataforma ficticia de demostración
+                        logoUrl: null
+                        durationHours: 8
+                page: 1
+                pageSize: 20
+                totalRecords: 1
+        '400':
+          description: Parámetros de paginación inválidos.
+        '401':
+          description: Solicitud no autenticada (validación en APIM).
+        '503':
+          description: Funcionalidad no disponible; los datos demo están bloqueados fuera de development y test.
+
+  /courses:
+    get:
+      tags:
+        - Catálogo de cursos
+      operationId: getCourses
+      summary: Consultar el catálogo de cursos
+      x-implementation-status: implemented-pending-contract-ratification
+      description: |
+        Implementado conforme a la propuesta, pendiente de ratificación del equipo
+        antes de fusionar el PR. No implica despliegue ni aprobación de acceso público.
+        Consulta general del catálogo persistente, sin personalización ni cálculo
+        de brechas. Las recomendaciones siguen formando parte de /skills-gap.
+        No exige que web o Android migren ni hagan una consulta adicional.
+
+        Los filtros son opcionales, se combinan con AND y se aplican antes de
+        paginar. Cada curso aparece una sola vez aunque tenga varias habilidades.
+        totalRecords cuenta cursos únicos que cumplen todos los filtros, antes
+        de paginar. Sin coincidencias o con una página posterior al último curso,
+        se propone HTTP 200 con items vacío; no HTTP 404.
+
+        Orden propuesto: courses.id ascendente, comparado como entero en SQL,
+        no como cadena pública. El orden es estable si no cambia el catálogo;
+        la paginación por página no garantiza una instantánea entre peticiones.
+        Los parámetros reconocidos aceptan un único valor; valores repetidos,
+        arreglos, objetos, textos vacíos o solo espacios son inválidos.
+        También se rechaza el byte NUL, no representable en text de PostgreSQL.
+        Los parámetros desconocidos se ignoran, como en /skills-gap.
+        Los errores JSON implementados contienen error y message; este formato
+        y los demás acuerdos del borrador requieren ratificación antes de fusionar.
+        El conteo y los items se obtienen en una única sentencia de solo lectura,
+        con la misma instantánea de PostgreSQL para cada respuesta.
+
+        Acceso y autenticación del catálogo pendientes de acuerdo. La ausencia
+        de security en este borrador no constituye aprobación de acceso anónimo.
+        Todos los ejemplos son ficticios; no representan recomendaciones reales.
+      parameters:
+        - in: query
+          name: page
+          required: false
+          description: |
+            Propuesta: entero positivo seguro en base 10, comenzando en 1.
+            No admite signos, espacios, decimales ni notación exponencial.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+            default: 1
+        - in: query
+          name: pageSize
+          required: false
+          description: |
+            Propuesta: máximo de cursos por página. Entero en base 10;
+            no admite signos, espacios, decimales ni notación exponencial.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - in: query
+          name: platform
+          required: false
+          description: |
+            Filtro propuesto por courses.platform. Coincidencia exacta sensible
+            a mayúsculas, sin normalización ni recorte implícito de espacios.
+            No se limita a una lista de plataformas que aún no se ha acordado.
+          schema:
+            type: string
+            minLength: 1
+          example: '[DEMO] Plataforma ficticia'
+        - in: query
+          name: isPaid
+          required: false
+          description: |
+            Filtro propuesto por courses.is_paid. Solo acepta los valores
+            literales true o false; omitirlo incluye ambos. No se infiere
+            precio, moneda ni disponibilidad comercial.
+          schema:
+            type: boolean
+          example: false
+        - in: query
+          name: skillName
+          required: false
+          description: |
+            Filtro propuesto por skills.name mediante course_skills.
+            Una sola habilidad, coincidencia exacta sensible a mayúsculas,
+            sin normalización ni recorte implícito de espacios.
+            Una habilidad sin coincidencias devuelve una página sin cursos.
+            No presupone un endpoint de habilidades ni un catálogo de sinónimos.
+          schema:
+            type: string
+            minLength: 1
+          example: '[DEMO] SQL'
+      responses:
+        '200':
+          description: 'Propuesta: página de cursos del catálogo; no es una lista de recomendaciones personalizadas.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoursesPage'
+              examples:
+                demoUnknownDuration:
+                  summary: Ejemplo ficticio con duración desconocida
+                  value:
+                    items:
+                      - id: '2'
+                        title: '[DEMO] Curso ficticio de backend'
+                        url: https://example.org/cvexpert-demo/backend
+                        platform: '[DEMO] Plataforma ficticia'
+                        logoUrl: null
+                        durationHours: null
+                        isPaid: true
+                        skills: ['[DEMO] SQL', '[DEMO] TypeScript']
+                    page: 1
+                    pageSize: 20
+                    totalRecords: 1
+                emptyPage:
+                  summary: Página posterior al último curso de un resultado de un curso
+                  value:
+                    items: []
+                    page: 2
+                    pageSize: 20
+                    totalRecords: 1
+        '400':
+          description: Parámetros de paginación o filtros inválidos. Formato implementado pendiente de ratificación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogError'
+              example:
+                error: INVALID_QUERY
+                message: Parámetros de consulta inválidos.
+        '503':
+          description: Catálogo temporalmente no disponible; sin detalles internos de PostgreSQL o configuración.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogError'
+              example:
+                error: CATALOG_UNAVAILABLE
+                message: El catálogo no está disponible temporalmente.
+
+components:
+  schemas:
+    CoursesPage:
+      type: object
+      description: Página del catálogo implementada conforme al borrador, pendiente de ratificación; independiente de SkillsGapPage.
+      required: [items, page, pageSize, totalRecords]
+      properties:
+        items:
+          type: array
+          description: Cursos únicos de esta página, ordenados por ID SQL ascendente.
+          items:
+            $ref: '#/components/schemas/CatalogCourse'
+        page:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalRecords:
+          type: integer
+          minimum: 0
+          description: Total de cursos únicos después de filtrar y antes de paginar.
+
+    CatalogCourse:
+      type: object
+      description: |
+        Curso del catálogo implementado conforme al borrador, pendiente de ratificación; independiente de
+        CourseSuggestion. Añade isPaid y skills; permite durationHours null.
+        No representa afinidad con un usuario ni una recomendación.
+      required: [id, title, url, platform, logoUrl, durationHours, isPaid, skills]
+      properties:
+        id:
+          type: string
+          description: |
+            Identificador público tratado como opaco por los clientes.
+            Propuesta de mapeo: String(courses.id), representación decimal
+            del entero SQL, sin cambiar la PK ni añadir prefijos o UUID.
+            Pendiente de aprobación; no restringe los IDs de CourseSuggestion.
+          example: '2'
+        title:
+          type: string
+          description: Título del curso; corresponde a courses.title.
+        url:
+          type: string
+          format: uri
+          description: Enlace HTTP(S) del curso; corresponde a courses.url.
+        platform:
+          type: string
+          description: Plataforma del curso; corresponde a courses.platform.
+        logoUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Enlace HTTP(S) a logo_url, o null si no está disponible.
+        durationHours:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: |
+            duration_hours; null significa desconocida, nunca se sustituye por 0.
+            La propiedad siempre está presente en esta propuesta. No modifica
+            durationHours obligatorio y no nullable de CourseSuggestion.
+        isPaid:
+          type: boolean
+          description: courses.is_paid; no incorpora información de precios.
+        skills:
+          type: array
+          uniqueItems: true
+          description: |
+            Nombres skills.name asociados mediante course_skills, sin duplicados.
+            Se propone un arreglo vacío si el curso no tiene habilidades asociadas.
+          items:
+            type: string
+
+    CatalogError:
+      type: object
+      description: Formato de error del catálogo implementado, pendiente de ratificación. No modifica errores de otros endpoints.
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          enum: [INVALID_QUERY, CATALOG_UNAVAILABLE]
+        message:
+          type: string
+
+    SkillsGapPage:
+      type: object
+      required: [items, page, pageSize, totalRecords]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillGapItem'
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+        totalRecords:
+          type: integer
+          minimum: 0
+
+    SkillGapItem:
+      type: object
+      required: [skillName, userLevel, marketLevel, courses]
+      properties:
+        skillName:
+          type: string
+        userLevel:
+          type: integer
+          description: Nivel del usuario; escala aún por acordar con el equipo.
+        marketLevel:
+          type: integer
+          description: Nivel de mercado; escala aún por acordar con el equipo.
+        courses:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseSuggestion'
+
+    CourseSuggestion:
+      type: object
+      required: [id, title, url, platform, logoUrl, durationHours]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+          format: uri
+        platform:
+          type: string
+        logoUrl:
+          type: string
+          format: uri
+          nullable: true
+        durationHours:
+          type: integer
+          minimum: 0
