@@ -49,6 +49,13 @@ y escala versionada nullable, sin cargar mercado ficticio ni fijar escala 0–10
 Aplicarla solo en local con `npm run db:migrate` como mantenedor; conceder al rol
 HTTP únicamente SELECT sobre la tabla nueva. Este PR no ejecuta nada en Azure.
 
+El [importador administrativo local](docs/market-import.md) valida archivos JSON
+revisados y calcula un dry-run con `npm run db:market:import -- --file <archivo>
+--scale <escala>`. Solo escribe con `--apply`; las actualizaciones requieren
+además `--allow-updates` y una observación posterior. Usa credenciales de
+mantenimiento en loopback y development/test, nunca el rol HTTP. No carga datos
+al iniciar el backend y no incorpora el importador al ZIP de producción.
+
 - `src/app.ts`: construye Express y conserva `/health`, sin abrir puertos.
 - `src/server.ts`: carga `.env` y abre el servidor HTTP.
 - `src/routes/skills-gap.routes.ts`: registra la ruta.
