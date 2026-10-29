@@ -39,6 +39,16 @@ las etiquetas del cuerpo permiten reconocerlo incluso sin leer encabezados.
 
 ## Organización
 
+El núcleo real de cálculo y su repositorio PostgreSQL están implementados y
+probados de forma independiente; **GET `/skills-gap` todavía usa exclusivamente
+el comportamiento demo descrito arriba**. Ver [diseño, evidencia de consumidores,
+permisos y decisiones de integración pendientes](docs/skills-gap-domain.md) y la
+[propuesta OpenAPI no implementada de entrada](docs/skills-gap-input.proposed.yaml).
+La migración `002_create_market_requirements.sql` añade requisitos con procedencia
+y escala versionada nullable, sin cargar mercado ficticio ni fijar escala 0–100.
+Aplicarla solo en local con `npm run db:migrate` como mantenedor; conceder al rol
+HTTP únicamente SELECT sobre la tabla nueva. Este PR no ejecuta nada en Azure.
+
 - `src/app.ts`: construye Express y conserva `/health`, sin abrir puertos.
 - `src/server.ts`: carga `.env` y abre el servidor HTTP.
 - `src/routes/skills-gap.routes.ts`: registra la ruta.
@@ -388,7 +398,9 @@ tablas evita repetir cursos o guardar listas de IDs en una columna.
   habilidad y comprobaciones de su FK. No se añaden índices especulativos para
   búsquedas HTTP que aún no existen.
 
-No se agregan tablas de usuarios, habilidades personales, mercado o recomendaciones.
+No se agregan tablas de usuarios, habilidades personales o recomendaciones.
+La migración 002 agrega la copia local de requisitos del mercado descrita en
+[el diseño del núcleo](docs/skills-gap-domain.md); no inserta requisitos reales ni demo.
 Los IDs SQL son internos; no establecen cómo se expondrán en un futuro contrato HTTP.
 
 **Incompatibilidad pendiente entre persistencia y contrato HTTP:** PostgreSQL
