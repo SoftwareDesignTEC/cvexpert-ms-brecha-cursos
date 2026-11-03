@@ -1,0 +1,124 @@
+{
+  "info": {
+    "name": "CVExpert — Brecha/Cursos",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Contrato del backend. Importar un entorno de ejemplo. APIM mantiene la operación de brecha en mock: no confirma integración productiva. No enviar X-ARR-ClientCert desde Postman: APIM presenta el certificado TLS a App Service. Ver postman/README.md."
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "['baseUrl', 'healthPath', 'coursesPath', 'skillsGapPath', 'page', 'pageSize', 'expectedGapStatus'].forEach(name => { if (!pm.variables.get(name)) throw new Error('Configurar variable de entorno: ' + name); });",
+          "if (!['200', '503'].includes(String(pm.variables.get('expectedGapStatus')))) throw new Error('expectedGapStatus debe ser 200 (demo local) o 503 (backend producción).');"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Salud",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Salud real', () => { pm.response.to.have.jsonSchema({type:'object',additionalProperties:false,required:['status','service'],properties:{status:{enum:['ok']},service:{enum:['brecha-cursos']}}}); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}{{healthPath}}",
+        "description": "Ruta parametrizada: confirmar el mapeo APIM/backend antes de ejecutar."
+      }
+    },
+    {
+      "name": "Catálogo PostgreSQL",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Esquema real', () => pm.response.to.have.jsonSchema({\"$ref\":\"#/definitions/CoursesPage\",\"definitions\":{\"CoursesPage\":{\"type\":\"object\",\"required\":[\"items\",\"page\",\"pageSize\",\"totalRecords\"],\"properties\":{\"items\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/CatalogCourse\"}},\"page\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":9007199254740991},\"pageSize\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":100},\"totalRecords\":{\"type\":\"integer\",\"minimum\":0}}},\"CatalogCourse\":{\"type\":\"object\",\"required\":[\"id\",\"title\",\"url\",\"platform\",\"logoUrl\",\"durationHours\",\"isPaid\",\"skills\"],\"properties\":{\"id\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"},\"url\":{\"type\":\"string\",\"format\":\"uri\"},\"platform\":{\"type\":\"string\"},\"logoUrl\":{\"anyOf\":[{\"type\":\"string\",\"format\":\"uri\"},{\"type\":\"null\"}]},\"durationHours\":{\"anyOf\":[{\"type\":\"integer\",\"minimum\":0},{\"type\":\"null\"}]},\"isPaid\":{\"type\":\"boolean\"},\"skills\":{\"type\":\"array\",\"uniqueItems\":true,\"items\":{\"type\":\"string\"}}}},\"CatalogError\":{\"type\":\"object\",\"required\":[\"error\",\"message\"],\"properties\":{\"error\":{\"type\":\"string\",\"enum\":[\"INVALID_QUERY\",\"CATALOG_UNAVAILABLE\"]},\"message\":{\"type\":\"string\"}}},\"SkillsGapPage\":{\"type\":\"object\",\"required\":[\"items\",\"page\",\"pageSize\",\"totalRecords\"],\"properties\":{\"items\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/SkillGapItem\"}},\"page\":{\"type\":\"integer\",\"minimum\":1},\"pageSize\":{\"type\":\"integer\",\"minimum\":1},\"totalRecords\":{\"type\":\"integer\",\"minimum\":0}}},\"SkillGapItem\":{\"type\":\"object\",\"required\":[\"skillName\",\"userLevel\",\"marketLevel\",\"courses\"],\"properties\":{\"skillName\":{\"type\":\"string\"},\"userLevel\":{\"type\":\"integer\"},\"marketLevel\":{\"type\":\"integer\"},\"courses\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/CourseSuggestion\"}}}},\"CourseSuggestion\":{\"type\":\"object\",\"required\":[\"id\",\"title\",\"url\",\"platform\",\"logoUrl\",\"durationHours\"],\"properties\":{\"id\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"},\"url\":{\"type\":\"string\",\"format\":\"uri\"},\"platform\":{\"type\":\"string\"},\"logoUrl\":{\"anyOf\":[{\"type\":\"string\",\"format\":\"uri\"},{\"type\":\"null\"}]},\"durationHours\":{\"type\":\"integer\",\"minimum\":0}}}}}));",
+              "pm.test('Paginación solicitada', () => { const body=pm.response.json(); pm.expect(body.page).to.eql(Number(pm.variables.get('page'))); pm.expect(body.pageSize).to.eql(Number(pm.variables.get('pageSize'))); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}{{coursesPath}}?page={{page}}&pageSize={{pageSize}}",
+        "description": "Ruta parametrizada: confirmar el mapeo APIM/backend antes de ejecutar."
+      }
+    },
+    {
+      "name": "Brecha — demo local o no disponible en producción",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const expected=Number(pm.variables.get('expectedGapStatus'));",
+              "pm.test('Código esperado del backend', () => pm.response.to.have.status(expected));",
+              "if (expected===503) {",
+              " pm.test('Demo bloqueada, sin simular integración', () => { pm.response.to.have.jsonSchema({type:'object',required:['error','message'],properties:{error:{enum:['SKILLS_GAP_UNAVAILABLE']},message:{type:'string'}}}); });",
+              "} else {",
+              " pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Esquema real', () => pm.response.to.have.jsonSchema({\"$ref\":\"#/definitions/SkillsGapPage\",\"definitions\":{\"CoursesPage\":{\"type\":\"object\",\"required\":[\"items\",\"page\",\"pageSize\",\"totalRecords\"],\"properties\":{\"items\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/CatalogCourse\"}},\"page\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":9007199254740991},\"pageSize\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":100},\"totalRecords\":{\"type\":\"integer\",\"minimum\":0}}},\"CatalogCourse\":{\"type\":\"object\",\"required\":[\"id\",\"title\",\"url\",\"platform\",\"logoUrl\",\"durationHours\",\"isPaid\",\"skills\"],\"properties\":{\"id\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"},\"url\":{\"type\":\"string\",\"format\":\"uri\"},\"platform\":{\"type\":\"string\"},\"logoUrl\":{\"anyOf\":[{\"type\":\"string\",\"format\":\"uri\"},{\"type\":\"null\"}]},\"durationHours\":{\"anyOf\":[{\"type\":\"integer\",\"minimum\":0},{\"type\":\"null\"}]},\"isPaid\":{\"type\":\"boolean\"},\"skills\":{\"type\":\"array\",\"uniqueItems\":true,\"items\":{\"type\":\"string\"}}}},\"CatalogError\":{\"type\":\"object\",\"required\":[\"error\",\"message\"],\"properties\":{\"error\":{\"type\":\"string\",\"enum\":[\"INVALID_QUERY\",\"CATALOG_UNAVAILABLE\"]},\"message\":{\"type\":\"string\"}}},\"SkillsGapPage\":{\"type\":\"object\",\"required\":[\"items\",\"page\",\"pageSize\",\"totalRecords\"],\"properties\":{\"items\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/SkillGapItem\"}},\"page\":{\"type\":\"integer\",\"minimum\":1},\"pageSize\":{\"type\":\"integer\",\"minimum\":1},\"totalRecords\":{\"type\":\"integer\",\"minimum\":0}}},\"SkillGapItem\":{\"type\":\"object\",\"required\":[\"skillName\",\"userLevel\",\"marketLevel\",\"courses\"],\"properties\":{\"skillName\":{\"type\":\"string\"},\"userLevel\":{\"type\":\"integer\"},\"marketLevel\":{\"type\":\"integer\"},\"courses\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/CourseSuggestion\"}}}},\"CourseSuggestion\":{\"type\":\"object\",\"required\":[\"id\",\"title\",\"url\",\"platform\",\"logoUrl\",\"durationHours\"],\"properties\":{\"id\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"},\"url\":{\"type\":\"string\",\"format\":\"uri\"},\"platform\":{\"type\":\"string\"},\"logoUrl\":{\"anyOf\":[{\"type\":\"string\",\"format\":\"uri\"},{\"type\":\"null\"}]},\"durationHours\":{\"type\":\"integer\",\"minimum\":0}}}}}));",
+              "pm.test('Paginación solicitada', () => { const body=pm.response.json(); pm.expect(body.page).to.eql(Number(pm.variables.get('page'))); pm.expect(body.pageSize).to.eql(Number(pm.variables.get('pageSize'))); });",
+              " pm.test('Datos identificados como demo', () => { pm.expect(pm.response.headers.get('X-Data-Mode')).to.eql('demo'); pm.expect(pm.response.headers.get('Cache-Control')).to.eql('no-store'); });",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}{{skillsGapPath}}?page={{page}}&pageSize={{pageSize}}",
+        "description": "Ruta parametrizada: confirmar el mapeo APIM/backend antes de ejecutar."
+      }
+    },
+    {
+      "name": "Catálogo — paginación inválida",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+              "pm.test('Error de consulta real', () => pm.response.to.have.jsonSchema({type:'object',required:['error','message'],properties:{error:{enum:['INVALID_QUERY']},message:{type:'string'}}}));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}{{coursesPath}}?page=0",
+        "description": "Ruta parametrizada: confirmar el mapeo APIM/backend antes de ejecutar."
+      }
+    }
+  ]
+}

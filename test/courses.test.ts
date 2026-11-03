@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Pool } from 'pg';
-import { createApp } from '../src/app.js';
+import { createApp, fetch } from './helpers/authenticated-app.js';
 import { InvalidCoursesQuery, parseCoursesQuery } from '../src/controllers/courses.controller.js';
 import { createPostgresCoursesRepository, type CoursesRepository } from '../src/repositories/courses.repository.js';
 import { createCoursesService } from '../src/services/courses.service.js';
