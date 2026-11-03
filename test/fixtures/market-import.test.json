@@ -1,0 +1,24 @@
+{
+  "formatVersion": 1,
+  "marketKey": "TEST-market-import",
+  "records": [
+    {
+      "marketKey": "TEST-market-import",
+      "skillName": "[TEST] SQL",
+      "scaleKey": "TEST-ordinal-v1",
+      "requiredLevel": 90,
+      "sourceReference": "TEST:synthetic-fixture-not-market-evidence",
+      "observedAt": "2026-01-01T00:00:00.000Z",
+      "dataKind": "reference"
+    },
+    {
+      "marketKey": "TEST-market-import",
+      "skillName": "[TEST] TypeScript",
+      "scaleKey": "TEST-ordinal-v1",
+      "requiredLevel": null,
+      "sourceReference": "TEST:synthetic-fixture-not-market-evidence",
+      "observedAt": "2026-01-01T00:00:00.000Z",
+      "dataKind": "reference"
+    }
+  ]
+}

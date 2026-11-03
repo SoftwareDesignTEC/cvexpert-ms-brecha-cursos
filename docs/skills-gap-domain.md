@@ -63,8 +63,9 @@ lock existentes aseguran una sola aplicación por versión. Una segunda ejecuci�
 no cambia datos. No se editaron migraciones previas ni se agregó seed de mercado.
 No se ejecuta ninguna migración, seed o importación al arrancar HTTP.
 
-La carga de requisitos queda en el rol dueño/mantenedor por SQL parametrizado o
-un importador revisado futuro; no hay endpoint administrativo ni job remoto.
+La carga de requisitos queda en el rol dueño/mantenedor mediante el
+[importador JSON local](market-import.md), con dry-run por defecto y aplicación
+explícita; no hay endpoint administrativo ni job remoto.
 No usamos el rol HTTP para mantenimiento. Para una base local ya migrada, su
 administrador concede únicamente el permiso nuevo (los otros SELECT ya existen):
 
