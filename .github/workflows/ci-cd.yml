@@ -174,6 +174,7 @@ jobs:
       AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       AZURE_DEPLOY_RUNNER: ${{ vars.AZURE_DEPLOY_RUNNER }}
+      AZURE_BACKEND_NETWORK_MODEL: ${{ vars.AZURE_BACKEND_NETWORK_MODEL }}
       AZURE_CORE_OUTPUT: none
       AZURE_WEBAPP_NAME: cvexpert-ms-brecha-cursos
       AZURE_RESOURCE_GROUP: rg-cvexpert
@@ -200,7 +201,7 @@ jobs:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Read-only safety checks (private backend, runtime and separate identity)
+      - name: Read-only safety checks (explicit network model, runtime and separate identity)
         run: node .github/scripts/azure-preflight.mjs
       - name: Deploy package with Entra token (no publish profile)
         env:
