@@ -84,7 +84,7 @@ test('configuración ausente o inválida cierra negocio y docs; health permanece
 });
 
 test('bypass requiere opción explícita, entorno local y ausencia de Azure', async () => {
-    for (const environment of ['development', 'test', 'production', 'staging', undefined]) {
+    for (const environment of ['development', 'test', 'production', 'staging', '']) {
         for (const azure of [false, true]) {
             for (const bypass of [undefined, 'true', 'false', 'TRUE']) {
                 await withHttpApp(createApp(environment, repository, {
@@ -102,4 +102,14 @@ test('bypass requiere opción explícita, entorno local y ausencia de Azure', as
         assert.equal((await fetch(`${url}/courses`)).status, 403);
         assert.equal((await fetch(`${url}/courses`, { headers: header('valid') })).status, 200);
     });
+    const previousEnvironment = process.env.NODE_ENV;
+    delete process.env.NODE_ENV;
+    try {
+        await withHttpApp(createApp(undefined, repository, { APIM_ALLOW_INSECURE_LOCAL: 'true' }), async url => {
+            assert.equal((await fetch(`${url}/courses`)).status, 503);
+        });
+    } finally {
+        if (previousEnvironment === undefined) delete process.env.NODE_ENV;
+        else process.env.NODE_ENV = previousEnvironment;
+    }
 });
