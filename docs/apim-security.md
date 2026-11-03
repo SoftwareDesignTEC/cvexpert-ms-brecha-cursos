@@ -20,6 +20,11 @@ La salud permanece disponible aunque falte configuración de seguridad.
 
 Para desarrollo/pruebas locales se requiere explícitamente
 `APIM_ALLOW_INSECURE_LOCAL=true` junto con `NODE_ENV=development` o `test`.
+El punto de entrada `src/server.ts` comparte esa decisión con el middleware y,
+cuando el bypass está activo, escucha únicamente en `127.0.0.1`. No se puede
+ampliar la escucha mediante una variable HOST. Las pruebas arrancan el servidor
+real y comprueban su socket, las respuestas HTTP y el rechazo desde otra
+interfaz IPv4 cuando está disponible.
 Se ignora el bypass en producción, entornos desconocidos o cuando existe una
 variable `WEBSITE_*` de App Service. No configurar Azure como entorno de demo.
 Los tests de seguridad usan certificados X.509 públicos independientes; las
@@ -60,6 +65,17 @@ remoto. Para abrirla mediante APIM se deben mapear también `/docs/*` y
 `/openapi.json`, manteniendo un prefijo coherente. La autenticación del navegador
 ante APIM debe estar resuelta; no introducir certificados reenviados en la UI.
 La interfaz describe el backend, no declara rutas públicas confirmadas.
+
+OpenAPI mantiene la versión 3.0 y sus esquemas funcionales. Esa versión no
+incluye un esquema de seguridad mTLS, por lo que el transporte se documenta en
+`x-backend-authentication`, sin representar `X-ARR-ClientCert` como API key ni
+ofrecerlo en el formulario de autorización de Swagger. Es un encabezado interno
+reenviado por App Service; el consumidor no debe introducirlo manualmente.
+`x-apim-user-authentication` describe la frontera consumidor–APIM: la política
+del gateway valida al usuario y sobrescribe su identidad. El backend no verifica
+tokens Google ni otros JWT. La ausencia de `securitySchemes` en este contrato
+interno no autoriza acceso anónimo: siguen vigentes mTLS y la validación de huella.
+Ver [Security Scheme Object de OpenAPI 3.0.3](https://spec.openapis.org/oas/v3.0.3.html#security-scheme-object).
 
 ## Conflicto con el preflight y decisión propuesta
 

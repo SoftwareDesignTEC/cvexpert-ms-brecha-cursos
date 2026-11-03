@@ -1,12 +1,16 @@
 import { X509Certificate } from 'node:crypto';
 import type { RequestHandler } from 'express';
 
+export function isLocalCertificateBypass(environment: string | undefined, settings: NodeJS.ProcessEnv): boolean {
+    const azure = Object.keys(settings).some(key => key.startsWith('WEBSITE_'));
+    return !azure && (environment === 'development' || environment === 'test')
+        && settings.APIM_ALLOW_INSECURE_LOCAL === 'true';
+}
+
 // Azure termina TLS e inyecta este encabezado. Fuera de esa frontera confiable,
 // el certificado público por sí solo no demuestra posesión de su clave privada.
 export function createApimCertificateGuard(environment: string | undefined, settings: NodeJS.ProcessEnv): RequestHandler {
-    const azure = Object.keys(settings).some(key => key.startsWith('WEBSITE_'));
-    const local = !azure && (environment === 'development' || environment === 'test')
-        && settings.APIM_ALLOW_INSECURE_LOCAL === 'true';
+    const local = isLocalCertificateBypass(environment, settings);
     const entries = (settings.APIM_CERT_THUMBPRINTS ?? '').split(',').map(value => value.trim().toUpperCase());
     const configured = entries.every(value => /^[A-F0-9]{40}$/.test(value));
     const allowed = new Set(entries);

@@ -10,6 +10,11 @@ info:
     Negocio y documentación requieren certificado APIM validado por el backend;
     /health queda excluido. La identidad X-User-Id/X-User-Email debe ser validada
     y sobrescrita por APIM. No basta con enviar esos encabezados.
+    La autenticación del usuario pertenece a APIM; el backend no verifica tokens Google.
+    APIM se autentica ante App Service con certificado TLS, no con una API key.
+    X-ARR-ClientCert es un encabezado interno reenviado por App Service; el consumidor
+    no debe introducirlo manualmente. Ver las extensiones x-apim-user-authentication
+    y x-backend-authentication para las dos fronteras de confianza.
 
 paths:
   /health:
@@ -449,17 +454,27 @@ components:
             - CATALOG_UNAVAILABLE
         message:
           type: string
-  securitySchemes:
-    ApimCertificate:
-      type: apiKey
-      in: header
-      name: X-ARR-ClientCert
-      description: Encabezado de infraestructura Base64 DER inyectado por App Service tras mTLS con APIM.
-        No debe enviarlo el cliente ni sustituye la posesión de la clave privada en TLS. App Service
-        debe exigir certificados cliente (Required), con /health excluido. El JWT de usuario se
-        valida en APIM según su política, no en este backend.
 servers:
   - url: /
     description: Backend interno; confirmar las rutas y reescrituras de APIM antes de probar el gateway.
-security:
-  - ApimCertificate: []
+x-apim-user-authentication:
+  boundary: consumer-to-apim
+  description: APIM valida la identidad del usuario según su política y sobrescribe X-User-Id y
+    X-User-Email. El contrato del gateway debe definir su mecanismo de autenticación y sus rutas
+    públicas. Este backend no verifica tokens Google ni otros JWT.
+x-backend-authentication:
+  type: mutualTLS
+  boundary: apim-to-app-service
+  description: APIM presenta el certificado cliente durante TLS. App Service lo exige y reenvía su
+    representación al backend, que valida formato, vigencia y huella. OpenAPI 3.0 no dispone de un
+    securityScheme mutualTLS; esta extensión documenta el control sin representarlo como una
+    credencial HTTP del consumidor. La ausencia de securitySchemes no autoriza acceso anónimo al
+    backend.
+  certificateForwarding:
+    header: X-ARR-ClientCert
+    source: Azure App Service tras recibir el certificado cliente en la conexión TLS
+    consumerSupplied: false
+    description: Encabezado interno de infraestructura. No introducirlo manualmente en Swagger ni
+      enviarlo desde el cliente como sustituto del certificado TLS.
+  excludedPaths:
+    - /health

@@ -7,6 +7,8 @@ Requiere Node.js 24 y npm. Instalar dependencias con `npm ci`, copiar
 `.env.example` a `.env` y ejecutar `npm run dev`. Para ejecutar el compilado:
 `npm run build` y `npm start`. Se usa `PORT=3000` de forma predeterminada. Para pruebas sin certificado se requiere
 `APIM_ALLOW_INSECURE_LOCAL=true` además de development/test; el bypass se ignora en Azure.
+Con ese bypass el servidor escucha solo en `127.0.0.1`; sin él conserva la
+escucha en `0.0.0.0` y exige la configuración de seguridad del certificado.
 
 `npm test` ejecuta las pruebas de integración con el runner de Node y `tsx`;
 cada servidor de prueba usa un puerto temporal en loopback y se cierra al finalizar.
