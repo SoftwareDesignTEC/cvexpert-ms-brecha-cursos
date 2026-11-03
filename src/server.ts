@@ -1,13 +1,15 @@
 import 'dotenv/config';
 import { createApp } from './app.js';
+import { isLocalCertificateBypass } from './security/apim-certificate.js';
 
 const app = createApp();
 
 //Determinar el puerto del servidor
 const port = Number(process.env.PORT ?? 3000);
 
-//Iniciar el servidor HTTP
-const server = app.listen(port, '0.0.0.0', () => {
+// El bypass y la dirección de escucha comparten la misma decisión de seguridad.
+const host = isLocalCertificateBypass(process.env.NODE_ENV, process.env) ? '127.0.0.1' : '0.0.0.0';
+export const server = app.listen(port, host, () => {
     console.log(`Servidor escuchando en puerto ${port}`);
 });
 

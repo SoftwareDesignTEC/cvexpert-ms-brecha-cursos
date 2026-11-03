@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import { after, before, test } from 'node:test';
-import { createApp } from '../src/app.js';
+import { createApp, fetch } from './helpers/authenticated-app.js';
 import type { SkillsGapPage } from '../src/services/skills-gap.service.js';
 
 const server = createApp('test').listen(0, '127.0.0.1');

@@ -5,7 +5,10 @@ Microservicio de brecha de habilidades y recomendación de cursos de CVExpert
 
 Requiere Node.js 24 y npm. Instalar dependencias con `npm ci`, copiar
 `.env.example` a `.env` y ejecutar `npm run dev`. Para ejecutar el compilado:
-`npm run build` y `npm start`. Se usa `PORT=3000` de forma predeterminada.
+`npm run build` y `npm start`. Se usa `PORT=3000` de forma predeterminada. Para pruebas sin certificado se requiere
+`APIM_ALLOW_INSECURE_LOCAL=true` además de development/test; el bypass se ignora en Azure.
+Con ese bypass el servidor escucha solo en `127.0.0.1`; sin él conserva la
+escucha en `0.0.0.0` y exige la configuración de seguridad del certificado.
 
 `npm test` ejecuta las pruebas de integración con el runner de Node y `tsx`;
 cada servidor de prueba usa un puerto temporal en loopback y se cierra al finalizar.
@@ -66,10 +69,14 @@ al iniciar el backend y no incorpora el importador al ZIP de producción.
 - `test/app.test.ts`: pruebas HTTP de salud, contrato, paginación,
   parámetros inválidos y bloqueo de demostración.
 
-`openapi.yaml` conserva los esquemas preliminares y documenta el modo demo.
-La autenticación descrita mediante APIM es una intención del contrato:
-esta versión no valida identidades ni utiliza `X-User-Id`.
-No se han implementado Azure ni Service Bus. El catálogo PostgreSQL descrito
+`openapi.yaml` documenta los tres endpoints activos y el modo demo. Swagger UI
+está disponible en `/docs/`, con contrato en `/openapi.yaml` y `/openapi.json`.
+Negocio y documentación exigen certificado APIM; `/health` queda independiente.
+Ver [seguridad y propuesta de despliegue](docs/apim-security.md) y
+[colección Postman y entornos de ejemplo](postman/README.md). La identidad de
+usuario debe validarse y sobrescribirse en APIM; no se autoriza por encabezados
+de identidad enviados por el cliente. La integración real sigue pendiente.
+No se ha modificado Azure ni Service Bus. El catálogo PostgreSQL descrito
 abajo es independiente del endpoint demo: `/skills-gap` no consulta la base.
 
 ## Contrato del catálogo — implementado, pendiente de ratificación
@@ -87,7 +94,7 @@ no se atribuyen aquí otros requisitos a ellos.
 | `page` y `pageSize` en `/skills-gap` | Implementados; nombres, valores predeterminados, límites y esquemas existentes se conservan. |
 | Catálogo PostgreSQL | Esquema, migraciones y seed opcional implementados; consultado por `/courses`. |
 | `GET /courses`, filtros y esquemas `CoursesPage`/`CatalogCourse` | Implementados conforme al borrador; sus decisiones contractuales requieren ratificación del equipo antes de fusionar el PR. No desplegado a Azure. |
-| Recomendaciones personalizadas reales e integración de identidad/APIM | No implementadas. No se introduce una política nueva de autenticación. |
+| Recomendaciones personalizadas reales e integración de identidad/APIM | Recomendaciones e identidad no integradas; validación de certificado implementada, pendiente de probar la frontera TLS de Azure. |
 
 La web y Android continúan consumiendo `/skills-gap`. Documentar `/courses`
 no exige otra llamada para obtener sus recomendaciones ni sustituye el arreglo
@@ -168,7 +175,7 @@ para cursos sin duración, o una evolución explícita del contrato con clientes
    manteniendo compatible el contrato actual de web y Android?
 5. ¿Qué política de acceso al catálogo se acordará y se ratifican los cuerpos
    JSON 400/503 implementados y el rechazo de NUL?
-   La ausencia de `security` en el borrador no aprueba acceso anónimo.
+   El contrato activo exige certificado APIM para negocio y documentación.
 6. ¿Se aprueban el orden, los límites, las reglas de filtros combinados y los
    estados HTTP propuestos antes de implementar la ruta?
 
@@ -549,7 +556,7 @@ Después de las pruebas, el job `Verify production ZIP (no deployment)` descarga
 el compilado del mismo run y ejecuta `.github/scripts/package-app.sh`. Construye
 el ZIP desde una lista permitida, no desde todo el workspace, y elimina de la
 copia los CLI compilados de migraciones y seeds. El verificador
-`verify-package.mjs` comprueba las rutas del ZIP, la presencia de `dist/server.js`,
+`verify-package.mjs` comprueba OpenAPI, las rutas del ZIP, la presencia de `dist/server.js`,
 `dist/app.js`, manifiestos y dependencias de producción; rechaza `.env`, SQL,
 directorios de migraciones/seeds, los CLI administrativos, archivos de claves,
 credenciales con nombres conocidos y rutas que intenten salir del directorio.
@@ -559,7 +566,10 @@ Luego extrae ese mismo ZIP en un directorio temporal y ejecuta el servidor
 compilado real con `NODE_ENV=production` y un puerto local temporal, sin heredar
 variables PG, Azure o tokens GitHub. Exige `/health=200` con su JSON exacto y
 `/skills-gap=503` y `/courses=503` sin configuración PostgreSQL, manteniendo
-`/health=200`. Cierra el proceso y elimina únicamente los archivos temporales.
+`/health=200`. Ejecuta una vez sin configuración de certificado para comprobar
+el cierre por defecto y otra con un certificado público de prueba autorizado
+para verificar Swagger, sus recursos y OpenAPI dentro del paquete. No simula
+la negociación TLS de Azure. Cierra el proceso y elimina únicamente los archivos temporales.
 La verificación forma parte del check obligatorio CI; no necesita OIDC o Azure.
 El filtrado de archivos no es un detector exhaustivo de secretos incrustados en
 código: sigue siendo necesario revisar que no se versionen credenciales.
