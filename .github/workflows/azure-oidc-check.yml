@@ -1,0 +1,78 @@
+name: Azure OIDC diagnostic (no deployment)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  branch-guard:
+    name: Require main before OIDC
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Reject any ref other than main
+        shell: bash
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != workflow_dispatch ] || [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo '::error::Rama no permitida: seleccionar main. No se ha solicitado OIDC.'
+            echo 'Rama no permitida; diagnóstico detenido antes de OIDC.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+  diagnostic:
+    name: OIDC and read-only preflight
+    needs: branch-guard
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    # Fixed GitHub-hosted runner; do not accept arbitrary runner labels from variables.
+    runs-on: ubuntu-24.04
+    environment: azure-production
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_BACKEND_NETWORK_MODEL: ${{ vars.AZURE_BACKEND_NETWORK_MODEL }}
+      AZURE_CORE_OUTPUT: none
+      AZURE_CORE_COLLECT_TELEMETRY: 'false'
+      AZURE_LOGIN_PRE_CLEANUP: 'true'
+      AZURE_LOGIN_POST_CLEANUP: 'true'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - name: Validate variables before login
+        id: configuration
+        shell: bash
+        run: |
+          node .github/scripts/azure-oidc-check.mjs configuration
+          printf 'AZURE_CONFIG_DIR=%s/azure-oidc-check-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+      - name: Authenticate with OIDC
+        id: login
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Verify subscription and App Service using reads
+        id: access
+        run: node .github/scripts/azure-oidc-check.mjs access
+      - name: Run repository preflight (public-mtls)
+        id: preflight
+        run: node .github/scripts/azure-oidc-check.mjs preflight
+      - name: Diagnostic result
+        if: always()
+        env:
+          CONFIGURATION_OUTCOME: ${{ steps.configuration.outcome }}
+          LOGIN_OUTCOME: ${{ steps.login.outcome }}
+          ACCESS_OUTCOME: ${{ steps.access.outcome }}
+          PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
+          PREFLIGHT_FAILURE_KIND: ${{ steps.preflight.outputs.failure_kind }}
+        run: node .github/scripts/azure-oidc-check.mjs summary
