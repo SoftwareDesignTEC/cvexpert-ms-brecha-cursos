@@ -11,4 +11,7 @@ coverage/
 .env.*
 !.env.example
 
+# Entradas de mercado revisadas localmente; no versionar datos operativos.
+/local-market-input/
+
 .vscode/

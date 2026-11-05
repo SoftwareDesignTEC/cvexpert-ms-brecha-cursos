@@ -3,14 +3,18 @@ info:
   title: CVExpert - Brecha de habilidades y cursos
   version: 0.1.0
   description: |
-    Borrador del contrato del microservicio. La exposición mediante Azure
-    API Management (APIM) es una intención de diseño, no una integración implementada.
-    GET /skills-gap está implementado únicamente en modo demostración y conserva
-    su contrato consumido por web y Android, incluidos los cursos sugeridos.
-    GET /courses está implementado con PostgreSQL conforme al borrador de catálogo.
-    Sus decisiones contractuales siguen pendientes de ratificación del equipo
-    antes de fusionar el PR; implementarlo no aprueba una política de acceso
-    ni implica desplegarlo o confirmar necesidades nuevas de web o Android.
+    Contrato activo del backend. GET /courses consulta PostgreSQL y GET /skills-gap
+    sigue en modo demo solo en development/test; en producción responde 503.
+    APIM está configurado por separado y su operación de brecha todavía usa un mock.
+    Las rutas públicas pueden diferir: no se declara el gateway como servidor equivalente.
+    Negocio y documentación requieren certificado APIM validado por el backend;
+    /health queda excluido. La identidad X-User-Id/X-User-Email debe ser validada
+    y sobrescrita por APIM. No basta con enviar esos encabezados.
+    La autenticación del usuario pertenece a APIM; el backend no verifica tokens Google.
+    APIM se autentica ante App Service con certificado TLS, no con una API key.
+    X-ARR-ClientCert es un encabezado interno reenviado por App Service; el consumidor
+    no debe introducirlo manualmente. Ver las extensiones x-apim-user-authentication
+    y x-backend-authentication para las dos fronteras de confianza.
 
 paths:
   /health:
@@ -28,17 +32,18 @@ paths:
               schema:
                 type: object
                 additionalProperties: false
-                required: [status, service]
+                required: [ status, service ]
                 properties:
                   status:
                     type: string
-                    enum: [ok]
+                    enum: [ ok ]
                   service:
                     type: string
-                    enum: [brecha-cursos]
+                    enum: [ brecha-cursos ]
               example:
                 status: ok
                 service: brecha-cursos
+      security: []
   /skills-gap:
     get:
       tags:
@@ -46,18 +51,18 @@ paths:
       operationId: getSkillsGap
       summary: Consultar brechas de habilidades y cursos sugeridos
       description: |
-        Devuelve las brechas del usuario autenticado. APIM valida su
-        identidad y comunica X-User-Id al backend; el cliente no debe
-        seleccionar otro usuario mediante ese encabezado.
-        La primera versión solo devuelve datos ficticios etiquetados [DEMO],
-        sin autenticación ni recomendaciones reales. Solo está habilitada con
-        NODE_ENV=development o test; en cualquier otro entorno devuelve 503.
+        Devuelve datos ficticios etiquetados [DEMO], sin recomendaciones reales
+        ni consulta de identidad o uso del motor interno de brechas. Solo está
+        habilitado con NODE_ENV=development o test; en producción devuelve 503.
+        Exige el mismo certificado APIM que el catálogo. La identidad de usuario
+        debe validarse y sobrescribirse en APIM antes de una futura integración.
         Los niveles ilustrativos no establecen una escala definitiva.
       parameters:
         - in: query
           name: page
           required: false
-          description: Entero positivo seguro en base 10, comenzando en 1. Una página fuera de rango devuelve items vacío.
+          description: Entero positivo seguro en base 10, comenzando en 1. Una página fuera de rango devuelve
+            items vacío.
           schema:
             type: integer
             minimum: 1
@@ -65,7 +70,8 @@ paths:
         - in: query
           name: pageSize
           required: false
-          description: Número máximo de brechas por página. Entero en base 10; no acepta decimales, signos, espacios, notación exponencial ni valores múltiples.
+          description: Número máximo de brechas por página. Entero en base 10; no acepta decimales, signos,
+            espacios, notación exponencial ni valores múltiples.
           schema:
             type: integer
             minimum: 1
@@ -79,11 +85,11 @@ paths:
               description: Identifica explícitamente el origen ficticio de los datos.
               schema:
                 type: string
-                enum: [demo]
+                enum: [ demo ]
             Cache-Control:
               schema:
                 type: string
-                enum: [no-store]
+                enum: [ no-store ]
           content:
             application/json:
               schema:
@@ -105,10 +111,32 @@ paths:
                 totalRecords: 1
         '400':
           description: Parámetros de paginación inválidos.
-        '401':
-          description: Solicitud no autenticada (validación en APIM).
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                properties:
+                  error:
+                    type: string
+                    enum:
+                      - INVALID_PAGINATION
+                  message:
+                    type: string
         '503':
-          description: Funcionalidad no disponible; los datos demo están bloqueados fuera de development y test.
+          description: Seguridad sin configurar o funcionalidad demo bloqueada fuera de development/test.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnavailableError"
+        "403":
+          description: Certificado ausente, malformado, fuera de vigencia o no autorizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CertificateError"
 
   /courses:
     get:
@@ -142,8 +170,8 @@ paths:
         El conteo y los items se obtienen en una única sentencia de solo lectura,
         con la misma instantánea de PostgreSQL para cada respuesta.
 
-        Acceso y autenticación del catálogo pendientes de acuerdo. La ausencia
-        de security en este borrador no constituye aprobación de acceso anónimo.
+        El backend exige certificado APIM. La política de identidad del gateway
+        requiere verificación de integración.
         Todos los ejemplos son ficticios; no representan recomendaciones reales.
       parameters:
         - in: query
@@ -204,7 +232,8 @@ paths:
           example: '[DEMO] SQL'
       responses:
         '200':
-          description: 'Propuesta: página de cursos del catálogo; no es una lista de recomendaciones personalizadas.'
+          description: 'Propuesta: página de cursos del catálogo; no es una lista de recomendaciones
+            personalizadas.'
           content:
             application/json:
               schema:
@@ -221,7 +250,7 @@ paths:
                         logoUrl: null
                         durationHours: null
                         isPaid: true
-                        skills: ['[DEMO] SQL', '[DEMO] TypeScript']
+                        skills: [ '[DEMO] SQL', '[DEMO] TypeScript' ]
                     page: 1
                     pageSize: 20
                     totalRecords: 1
@@ -233,7 +262,8 @@ paths:
                     pageSize: 20
                     totalRecords: 1
         '400':
-          description: Parámetros de paginación o filtros inválidos. Formato implementado pendiente de ratificación.
+          description: Parámetros de paginación o filtros inválidos. Formato implementado pendiente de
+            ratificación.
           content:
             application/json:
               schema:
@@ -242,21 +272,25 @@ paths:
                 error: INVALID_QUERY
                 message: Parámetros de consulta inválidos.
         '503':
-          description: Catálogo temporalmente no disponible; sin detalles internos de PostgreSQL o configuración.
+          description: Seguridad sin configurar o catálogo temporalmente no disponible; sin detalles internos.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CatalogError'
-              example:
-                error: CATALOG_UNAVAILABLE
-                message: El catálogo no está disponible temporalmente.
+                $ref: "#/components/schemas/UnavailableError"
+        "403":
+          description: Certificado ausente, malformado, fuera de vigencia o no autorizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CertificateError"
 
 components:
   schemas:
     CoursesPage:
       type: object
-      description: Página del catálogo implementada conforme al borrador, pendiente de ratificación; independiente de SkillsGapPage.
-      required: [items, page, pageSize, totalRecords]
+      description: Página del catálogo implementada conforme al borrador, pendiente de ratificación;
+        independiente de SkillsGapPage.
+      required: [ items, page, pageSize, totalRecords ]
       properties:
         items:
           type: array
@@ -282,7 +316,7 @@ components:
         Curso del catálogo implementado conforme al borrador, pendiente de ratificación; independiente de
         CourseSuggestion. Añade isPaid y skills; permite durationHours null.
         No representa afinidad con un usuario ni una recomendación.
-      required: [id, title, url, platform, logoUrl, durationHours, isPaid, skills]
+      required: [ id, title, url, platform, logoUrl, durationHours, isPaid, skills ]
       properties:
         id:
           type: string
@@ -329,18 +363,19 @@ components:
 
     CatalogError:
       type: object
-      description: Formato de error del catálogo implementado, pendiente de ratificación. No modifica errores de otros endpoints.
-      required: [error, message]
+      description: Formato de error del catálogo implementado, pendiente de ratificación. No modifica
+        errores de otros endpoints.
+      required: [ error, message ]
       properties:
         error:
           type: string
-          enum: [INVALID_QUERY, CATALOG_UNAVAILABLE]
+          enum: [ INVALID_QUERY, CATALOG_UNAVAILABLE ]
         message:
           type: string
 
     SkillsGapPage:
       type: object
-      required: [items, page, pageSize, totalRecords]
+      required: [ items, page, pageSize, totalRecords ]
       properties:
         items:
           type: array
@@ -358,7 +393,7 @@ components:
 
     SkillGapItem:
       type: object
-      required: [skillName, userLevel, marketLevel, courses]
+      required: [ skillName, userLevel, marketLevel, courses ]
       properties:
         skillName:
           type: string
@@ -375,7 +410,7 @@ components:
 
     CourseSuggestion:
       type: object
-      required: [id, title, url, platform, logoUrl, durationHours]
+      required: [ id, title, url, platform, logoUrl, durationHours ]
       properties:
         id:
           type: string
@@ -393,3 +428,53 @@ components:
         durationHours:
           type: integer
           minimum: 0
+    CertificateError:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          enum:
+            - APIM_CERTIFICATE_REQUIRED
+        message:
+          type: string
+    UnavailableError:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          enum:
+            - APIM_SECURITY_UNAVAILABLE
+            - SKILLS_GAP_UNAVAILABLE
+            - CATALOG_UNAVAILABLE
+        message:
+          type: string
+servers:
+  - url: /
+    description: Backend interno; confirmar las rutas y reescrituras de APIM antes de probar el gateway.
+x-apim-user-authentication:
+  boundary: consumer-to-apim
+  description: APIM valida la identidad del usuario según su política y sobrescribe X-User-Id y
+    X-User-Email. El contrato del gateway debe definir su mecanismo de autenticación y sus rutas
+    públicas. Este backend no verifica tokens Google ni otros JWT.
+x-backend-authentication:
+  type: mutualTLS
+  boundary: apim-to-app-service
+  description: APIM presenta el certificado cliente durante TLS. App Service lo exige y reenvía su
+    representación al backend, que valida formato, vigencia y huella. OpenAPI 3.0 no dispone de un
+    securityScheme mutualTLS; esta extensión documenta el control sin representarlo como una
+    credencial HTTP del consumidor. La ausencia de securitySchemes no autoriza acceso anónimo al
+    backend.
+  certificateForwarding:
+    header: X-ARR-ClientCert
+    source: Azure App Service tras recibir el certificado cliente en la conexión TLS
+    consumerSupplied: false
+    description: Encabezado interno de infraestructura. No introducirlo manualmente en Swagger ni
+      enviarlo desde el cliente como sustituto del certificado TLS.
+  excludedPaths:
+    - /health

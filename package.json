@@ -9,8 +9,9 @@
     "db:seed": "tsx src/db/cli.ts seed",
     "db:check": "tsx src/db/cli.ts check",
     "db:test": "node --import tsx --test test/db/*.test.ts",
+    "db:market:import": "tsx scripts/import-market.ts",
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsc && tsc -p tsconfig.maintenance.json",
     "start": "node dist/server.js"
   },
   "repository": {
@@ -28,12 +29,15 @@
   "dependencies": {
     "dotenv": "^18.0.8",
     "express": "^5.3.0",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "swagger-ui-dist": "^5.34.1",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
+    "@types/swagger-ui-dist": "^3.30.6",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }

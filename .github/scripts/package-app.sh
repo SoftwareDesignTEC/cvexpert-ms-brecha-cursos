@@ -9,12 +9,12 @@ repository_dir="$PWD"
 
 # Allowlist, not zip-the-workspace: never copy .env, SQL, tests or runner credentials.
 cp -R "${RUNNER_TEMP:?}/release/dist" "$release_dir/dist"
-cp package.json package-lock.json "$release_dir/"
+cp openapi.yaml package.json package-lock.json "$release_dir/"
 # Administrative CLIs are not part of the deployed HTTP application.
 rm -f -- "$release_dir/dist/db/cli.js" "$release_dir/dist/db/migrate.js" "$release_dir/dist/db/seed.js"
 npm ci --omit=dev --ignore-scripts --prefix "$release_dir"
 (
   cd "$release_dir"
-  zip -q -r "$zip_file" dist node_modules package.json package-lock.json
+  zip -q -r "$zip_file" dist node_modules openapi.yaml package.json package-lock.json
 )
 node "$repository_dir/.github/scripts/verify-package.mjs" "$zip_file"

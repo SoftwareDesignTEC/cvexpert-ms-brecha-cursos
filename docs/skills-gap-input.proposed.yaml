@@ -1,0 +1,73 @@
+openapi: 3.0.3
+info:
+  title: CVExpert - Propuesta de entrada privada para Brecha
+  version: 0.0.1-proposed
+  description: |
+    PROPUESTA NO IMPLEMENTADA NI APROBADA. Documento separado del contrato activo.
+    No habilita rutas, autenticación ni cambios en GET /skills-gap.
+    Requiere identidad comprobada de APIM, certificados y bloqueo del acceso directo.
+paths:
+  /skills-gap/input:
+    put:
+      operationId: proposeReplaceSkillsGapInput
+      x-implementation-status: proposed-not-implemented
+      summary: '[PROPUESTA] Reemplazar entrada del usuario autenticado'
+      description: |
+        Sin userId ni encabezados de identidad elegidos por cliente. El backend
+        solo podrá asociar datos a una identidad cuando la frontera APIM esté
+        verificada; un X-User-Id por sí solo no es confiable.
+        Reemplazo atómico e idempotente de la instantánea completa del usuario.
+        skills vacío elimina la entrada conocida, no asigna nivel cero.
+        marketKey selecciona un contexto permitido, nunca permite escribir mercado.
+        scaleKey referencia un acuerdo registrado en el servidor; el cliente no
+        define escalas ni traduce niveles textuales sin acuerdo. La aceptación
+        de autoevaluaciones, persistencia, retención y política de lectura necesitan
+        ratificación. No hay llamadas directas a otros microservicios.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [marketKey, scaleKey, skills]
+              properties:
+                marketKey:
+                  type: string
+                  minLength: 1
+                  description: Contexto registrado y autorizado; semántica pendiente de aprobación.
+                scaleKey:
+                  type: string
+                  minLength: 1
+                  description: Clave versionada de la escala acordada; no un rango arbitrario.
+                skills:
+                  type: array
+                  description: Nombres canónicos únicos, sin duplicados; NULL significa nivel desconocido.
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [skillName, level]
+                    properties:
+                      skillName:
+                        type: string
+                        minLength: 1
+                      level:
+                        type: integer
+                        format: int32
+                        nullable: true
+                        description: Miembro de la escala registrada, o null; nunca completar desconocidos con cero.
+      responses:
+        '204':
+          description: Propuesta de instantánea reemplazada; no implica análisis completo ni recomendaciones disponibles.
+        '400':
+          description: Entrada inválida, duplicados o nivel no perteneciente a la escala.
+        '401':
+          description: Identidad no verificada mediante el mecanismo acordado.
+        '403':
+          description: Contexto no autorizado o intento de seleccionar otra identidad.
+        '409':
+          description: Escala o contexto todavía no acordados o registrados.
+        '413':
+          description: Entrada supera límites operativos que el equipo debe definir.
+        '503':
+          description: Persistencia o frontera segura de identidad no disponible.

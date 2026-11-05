@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import { createServer, type AddressInfo } from 'node:net';
 import { test } from 'node:test';
 import { Pool } from 'pg';
-import { createApp } from '../../src/app.js';
+import { createApp, fetch } from '../helpers/authenticated-app.js';
 import { getDatabaseConfig } from '../../src/db/config.js';
 import { migrate } from '../../src/db/migrate.js';
 import { inTransaction } from '../../src/db/transaction.js';

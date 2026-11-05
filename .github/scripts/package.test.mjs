@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { validateEntries } from './verify-package.mjs';
 
-const valid = ['dist/server.js', 'dist/app.js', 'package.json', 'package-lock.json',
-    'node_modules/express/package.json', 'node_modules/dotenv/package.json', 'node_modules/pg/package.json'];
+const valid = ['dist/server.js', 'dist/app.js', 'dist/documentation.js', 'dist/security/apim-certificate.js', 'openapi.yaml', 'package.json', 'package-lock.json',
+    'node_modules/swagger-ui-dist/package.json', 'node_modules/swagger-ui-dist/swagger-ui.css', 'node_modules/swagger-ui-dist/swagger-ui-bundle.js', 'node_modules/yaml/package.json', 'node_modules/express/package.json', 'node_modules/dotenv/package.json', 'node_modules/pg/package.json'];
 
 test('ZIP must contain the compiled server and required production dependencies', () => {
     assert.doesNotThrow(() => validateEntries(valid));
