@@ -1,6 +1,10 @@
 # cvexpert-ms-brecha-cursos
 Microservicio de brecha de habilidades y recomendación de cursos de CVExpert
 
+Importación administrativa **solo local**, con dry-run predeterminado y revisión
+de conflictos: [catálogo de cursos y habilidades](docs/catalog-import.md).
+No es una funcionalidad HTTP desplegada ni habilita cargas a Azure.
+
 ## Ejecución local
 
 Requiere Node.js 24 y npm. Instalar dependencias con `npm ci`, copiar
