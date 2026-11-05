@@ -1,6 +1,6 @@
 {
   "name": "cvexpert-ms-brecha-cursos",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Microservicio de brecha de habilidades y recomendación de cursos de CVExpert",
   "main": "index.js",
   "scripts": {
