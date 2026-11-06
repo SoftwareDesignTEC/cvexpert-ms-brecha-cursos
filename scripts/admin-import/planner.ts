@@ -12,13 +12,19 @@ import { AdminImportError, parseTarget, type Target } from './config.js';
 export const sha256 = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export function prepareInput(catalog: unknown, market: unknown, scaleValue: unknown) {
     const scale = parseScale(scaleValue);
+    if (scale.key === 'cv-skill-v1' && JSON.stringify(scale.levels) !== '[1,2,3,4]') {
+        throw new AdminImportError('cv-skill-v1 requiere exactamente los niveles ordinales [1,2,3,4].');
+    }
     const input = { catalog: parseCatalogDocument(catalog), market: parseImportDocument(market, scale), scale };
     if (input.market.records.some(r => r.dataKind !== 'reference')) throw new AdminImportError('El procedimiento administrativo rechaza requisitos demo.');
+    if ([...input.catalog.skills, ...input.catalog.courses.flatMap(c => [c.title, ...c.skills])].some(v => v.includes('[DEMO]'))) {
+        throw new AdminImportError('El catálogo administrativo rechaza marcadores DEMO.');
+    }
     return input;
 }
 export type PreparedInput = ReturnType<typeof prepareInput>;
 
-export async function verifySession(client: PoolClient, target: Target) {
+export async function verifySession(client: PoolClient, target: Target, mode: 'preview' | 'apply' = 'preview') {
     parseTarget(target);
     // A verified TLS certificate binds this socket to the exact reviewed FQDN.
     const stream = (client as unknown as { connection: { stream: TLSSocket } }).connection.stream;
@@ -49,17 +55,45 @@ export async function verifySession(client: PoolClient, target: Target) {
     const s = result.rows[0];
     if (!s || s.database !== target.database || s.identity !== target.identity || s.session_identity !== target.identity
         || [s.identity, s.session_identity].some(v => String(v).toLowerCase().split('@')[0] === 'cvexpert_brecha_app')
-        || s.read_only !== 'on' || s.isolation !== 'repeatable read' || s.server_port !== target.port
-        || !s.server_address || !s.tls || !s.restricted || !s.schema_allowed || !s.can_read || !s.no_dml || !s.no_snapshots || !s.ordinary_tables) {
+        || s.read_only !== (mode === 'apply' ? 'off' : 'on') || s.isolation !== (mode === 'apply' ? 'read committed' : 'repeatable read') || s.server_port !== target.port
+        || !s.server_address || !s.tls || !s.restricted || !s.schema_allowed || !s.can_read || (mode === 'preview' && !s.no_dml) || !s.no_snapshots || !s.ordinary_tables) {
         throw new AdminImportError('Servidor, base, sesión o permisos mínimos no coinciden con la revisión.');
     }
+    const access = await client.query(`SELECT
+        has_table_privilege(current_user, 'public.admin_import_runs', 'SELECT') AS audit_read,
+        NOT has_table_privilege(current_user, 'public.admin_import_runs', 'UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') AS audit_immutable,
+        NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class c WHERE c.oid = 'public.admin_import_runs'::regclass
+            AND (c.relkind <> 'r' OR c.relrowsecurity)) AS audit_ordinary,
+        (SELECT bool_and(has_table_privilege(current_user, t, 'INSERT')) FROM
+            unnest(ARRAY['public.skills','public.courses','public.course_skills','public.market_requirements','public.admin_import_runs']) t) AS inserts,
+        (SELECT bool_and(NOT has_table_privilege(current_user, t, p)) FROM
+            unnest(ARRAY['public.skills','public.courses','public.course_skills','public.market_requirements','public.schema_migrations']) t
+            CROSS JOIN unnest(ARRAY['UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p) AS no_mutation,
+        NOT has_table_privilege(current_user, 'public.schema_migrations', 'INSERT') AS no_history_write,
+        has_sequence_privilege(current_user, 'public.skills_id_seq', 'USAGE')
+            AND has_sequence_privilege(current_user, 'public.courses_id_seq', 'USAGE') AS sequences,
+        has_function_privilege(current_user, 'public.lock_admin_import_tables()', 'EXECUTE') AS can_lock,
+        NOT has_any_column_privilege(current_user, 'public.user_skill_snapshots', 'SELECT,INSERT,UPDATE,REFERENCES') AS no_snapshot_columns,
+        (SELECT bool_and(NOT has_any_column_privilege(current_user, t, 'UPDATE,REFERENCES')) FROM
+            unnest(ARRAY['public.skills','public.courses','public.course_skills','public.schema_migrations','public.admin_import_runs']) t)
+            AND NOT has_column_privilege(current_user, 'public.market_requirements', 'market_key', 'UPDATE')
+            AND NOT has_column_privilege(current_user, 'public.market_requirements', 'skill_id', 'UPDATE') AS no_column_mutation,
+        (SELECT bool_and(NOT has_any_column_privilege(current_user, t, 'INSERT,UPDATE,REFERENCES')) FROM
+            unnest(ARRAY['public.skills','public.courses','public.course_skills','public.market_requirements','public.schema_migrations','public.admin_import_runs']) t) AS reader_no_column_dml,
+        NOT has_table_privilege(current_user, 'public.admin_import_runs', 'INSERT') AS audit_no_insert`);
+    const a = access.rows[0];
+    if (!a?.audit_read || !a.audit_immutable || !a.audit_ordinary || !a.no_snapshot_columns || !a.no_column_mutation
+        || (mode === 'apply' ? (!a.inserts || !a.no_mutation || !a.no_history_write || !a.sequences || !a.can_lock)
+            : (!a.audit_no_insert || !a.reader_no_column_dml))) {
+        throw new AdminImportError('Permisos administrativos de auditoría/escritura inválidos.');
+    }
     // Pin the historical migration checksums; do not run the migrator or read user snapshots.
-    const expected = await Promise.all(['001_create_catalog.sql', '002_create_market_requirements.sql', '003_create_user_skill_snapshots.sql']
+    const expected = await Promise.all(['001_create_catalog.sql', '002_create_market_requirements.sql', '003_create_user_skill_snapshots.sql', '004_create_admin_import_runs.sql']
         .map(async name => ({ name, checksum: createHash('sha256').update((await readFile(new URL(`../../db/migrations/${name}`, import.meta.url), 'utf8')).replace(/\r\n/g, '\n')).digest('hex') })));
     const history = await client.query('SELECT name, checksum FROM public.schema_migrations ORDER BY name');
     if (JSON.stringify(history.rows) !== JSON.stringify(expected)) throw new AdminImportError('Historial de migraciones distinto del revisado; detener y revisar.');
     return { ...target, serverAddress: s.server_address as string, tls: stream.getProtocol(),
-        certificateVerified: true, readOnly: true, permissions: 'select-only', migrations: expected };
+        certificateVerified: true, readOnly: mode === 'preview', permissions: mode === 'preview' ? 'select-only' : 'insert-only', migrations: expected };
 }
 
 export async function planAdministrativeImport(pool: Pool, target: Target, value: PreparedInput) {
@@ -96,7 +130,7 @@ export async function planAdministrativeImport(pool: Pool, target: Target, value
                 marketUpdatesRequiringReview: market?.changes.filter(r => r.action === 'update').length ?? null,
                 conflicts: conflicts.length + (catalog?.conflicts ?? 0),
             },
-            // A clean preview never authorizes writes; this release has no apply capability.
+            // A clean preview never authorizes writes; apply uses a separate signed-approval command.
             applyAvailable: false,
         };
     });

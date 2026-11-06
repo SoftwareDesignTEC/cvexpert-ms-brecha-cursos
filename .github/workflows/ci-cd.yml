@@ -91,6 +91,21 @@ jobs:
           docker exec "$POSTGRES_CONTAINER" psql -U postgres -d cvexpert_ci
           -v ON_ERROR_STOP=1 -c "CREATE ROLE cvexpert_ci LOGIN NOSUPERUSER NOCREATEROLE CREATEDB PASSWORD 'ci-only-disposable-password';"
           -c "CREATE ROLE cvexpert_brecha_app LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB NOINHERIT PASSWORD 'ci-readonly-disposable-password';"
+      - name: Prepare disposable administrative roles and local TLS
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec "$POSTGRES_CONTAINER" psql -U postgres -d cvexpert_ci -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE cvexpert_admin_preview_test LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB NOINHERIT PASSWORD 'TEST-preview-only';" \
+            -c "CREATE ROLE cvexpert_admin_apply_test LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB NOINHERIT PASSWORD 'TEST-apply-only';"
+          docker exec "$POSTGRES_CONTAINER" bash -c 'openssl req -x509 -newkey rsa:2048 -nodes -keyout /var/lib/postgresql/data/server.key -out /var/lib/postgresql/data/server.crt -days 2 -subj /CN=test.postgres.database.azure.com -addext subjectAltName=DNS:test.postgres.database.azure.com >/dev/null 2>&1 && chown postgres:postgres /var/lib/postgresql/data/server.key /var/lib/postgresql/data/server.crt && chmod 600 /var/lib/postgresql/data/server.key'
+          docker exec "$POSTGRES_CONTAINER" psql -U postgres -d cvexpert_ci -v ON_ERROR_STOP=1 \
+            -c "ALTER SYSTEM SET ssl='on';" \
+            -c "ALTER SYSTEM SET ssl_cert_file='/var/lib/postgresql/data/server.crt';" \
+            -c "ALTER SYSTEM SET ssl_key_file='/var/lib/postgresql/data/server.key';" \
+            -c "SELECT pg_reload_conf();"
+          docker cp "$POSTGRES_CONTAINER:/var/lib/postgresql/data/server.crt" "$RUNNER_TEMP/admin-import-test-ca.pem"
+          echo "ADMIN_IMPORT_TEST_CA=$RUNNER_TEMP/admin-import-test-ca.pem" >> "$GITHUB_ENV"
       # The helper can only create/drop its own disposable databases.
       - run: npm run db:test
       - name: Retain tested build for ZIP verification
