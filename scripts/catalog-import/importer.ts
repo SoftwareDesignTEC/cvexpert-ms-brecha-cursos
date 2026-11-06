@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { getDatabaseConfig } from '../../src/db/config.js';
 import { inTransaction } from '../../src/db/transaction.js';
 import { CatalogImportError, parseCatalogDocument } from './document.js';
@@ -35,7 +35,7 @@ export async function importCatalog(pool: Pool, value: unknown, options: { apply
     env: NodeJS.ProcessEnv = process.env): Promise<CatalogReport> {
     assertCatalogMaintenance(env);
     assertCatalogMaintenance({ ...env, PGHOST: String(pool.options.host ?? ''), PGUSER: String(pool.options.user ?? '') });
-    const document = parseCatalogDocument(value);
+    parseCatalogDocument(value);
     return inTransaction(pool, async client => {
         // Peer TCP real: también funciona con PostgreSQL desechable publicado por Docker.
         // Un túnel local no se distingue de un servidor local; está prohibido operativamente.
@@ -61,40 +61,8 @@ export async function importCatalog(pool: Pool, value: unknown, options: { apply
             // Bloquea también DML no cooperativo; permite SELECT de HTTP.
             await client.query('LOCK TABLE public.skills, public.courses, public.course_skills IN SHARE ROW EXCLUSIVE MODE');
         }
-        const names = [...new Set([...document.skills, ...document.courses.flatMap(c => c.skills)])];
-        const skills = await client.query<{ id: number; name: string }>('SELECT id, name FROM public.skills WHERE name = ANY($1::text[])', [names]);
-        const skillIds = new Map(skills.rows.map(s => [s.name, s.id]));
-        const declared = new Set(document.skills);
-        if (names.some(name => !skillIds.has(name) && !declared.has(name))) {
-            throw new CatalogImportError('Habilidad referenciada ausente del lote y del catálogo.');
-        }
-        const existing = await client.query<StoredCourse>(`SELECT c.id, c.title, c.platform, c.url,
-            c.is_paid AS "isPaid", c.duration_hours AS "durationHours", c.logo_url AS "logoUrl",
-            ARRAY(SELECT s.name FROM public.course_skills cs JOIN public.skills s ON s.id=cs.skill_id
-                WHERE cs.course_id=c.id) AS skills
-            FROM public.courses c WHERE c.url = ANY($1::text[])`, [document.courses.map(c => c.url)]);
-        const courses = new Map(existing.rows.map(c => [c.url, c]));
-        const report: CatalogReport = {
-            mode: options.apply ? 'applied' : 'dry-run', batchId: document.batchId, reviewedAt: document.reviewedAt,
-            documentSha256: createHash('sha256').update(JSON.stringify(document)).digest('hex'), provenancePersisted: false,
-            skills: names.map(name => ({ name, action: skillIds.has(name) ? 'existing' : 'insert' })),
-            courses: document.courses.map(course => {
-                const before = courses.get(course.url);
-                const differences: string[] = [];
-                if (before) {
-                    for (const key of ['title', 'platform', 'isPaid', 'durationHours', 'logoUrl'] as const) {
-                        if (before[key] !== course[key]) differences.push(key);
-                    }
-                    if (before.skills.length !== course.skills.length || before.skills.some(s => !course.skills.includes(s))) differences.push('skills');
-                }
-                return { url: course.url, sourceReference: course.sourceReference,
-                    action: !before ? 'insert' : differences.length ? 'conflict' : 'unchanged', differences };
-            }),
-            associations: document.courses.flatMap(c => c.skills.map(skill => ({ url: c.url, skill,
-                action: !courses.has(c.url) ? 'insert' : courses.get(c.url)!.skills.includes(skill) ? 'existing' : 'conflict' }))),
-            conflicts: 0,
-        };
-        report.conflicts = report.courses.filter(c => c.action === 'conflict').length;
+        const { document, report, skillIds, courses } = await planCatalog(client, value);
+        if (options.apply) report.mode = 'applied';
         if (options.apply && report.conflicts) throw new CatalogConflictError({ ...report, mode: 'rejected' });
         if (options.apply) {
             for (const skill of report.skills.filter(s => s.action === 'insert')) {
@@ -116,4 +84,45 @@ export async function importCatalog(pool: Pool, value: unknown, options: { apply
         }
         return report;
     });
+}
+
+// Shared query-only planner. Callers own transaction, target and identity checks.
+export async function planCatalog(client: PoolClient, value: unknown) {
+    const document = parseCatalogDocument(value);
+    const names = [...new Set([...document.skills, ...document.courses.flatMap(c => c.skills)])];
+    const skills = await client.query<{ id: number; name: string }>('SELECT id, name FROM public.skills WHERE name = ANY($1::text[])', [names]);
+    const skillIds = new Map(skills.rows.map(s => [s.name, s.id]));
+    const declared = new Set(document.skills);
+    if (names.some(name => !skillIds.has(name) && !declared.has(name))) {
+        throw new CatalogImportError('Habilidad referenciada ausente del lote y del catálogo.');
+    }
+    const existing = await client.query<StoredCourse>(`SELECT c.id, c.title, c.platform, c.url,
+        c.is_paid AS "isPaid", c.duration_hours AS "durationHours", c.logo_url AS "logoUrl",
+        ARRAY(SELECT s.name FROM public.course_skills cs JOIN public.skills s ON s.id=cs.skill_id
+            WHERE cs.course_id=c.id) AS skills
+        FROM public.courses c WHERE c.url = ANY($1::text[])`, [document.courses.map(c => c.url)]);
+    const courses = new Map(existing.rows.map(c => [c.url, c]));
+    const report: CatalogReport = {
+        mode: 'dry-run', batchId: document.batchId, reviewedAt: document.reviewedAt,
+        documentSha256: createHash('sha256').update(JSON.stringify(document)).digest('hex'), provenancePersisted: false,
+        skills: names.map(name => ({ name, action: skillIds.has(name) ? 'existing' : 'insert' })),
+        courses: document.courses.map(course => {
+            const before = courses.get(course.url);
+            const differences: string[] = [];
+            if (before) {
+                for (const key of ['title', 'platform', 'isPaid', 'durationHours', 'logoUrl'] as const) {
+                    if (before[key] !== course[key]) differences.push(key);
+                }
+                if (before.skills.length !== course.skills.length || before.skills.some(s => !course.skills.includes(s))) differences.push('skills');
+            }
+            return { url: course.url, sourceReference: course.sourceReference,
+                action: !before ? 'insert' : differences.length ? 'conflict' : 'unchanged', differences };
+        }),
+        associations: document.courses.flatMap(c => c.skills.map(skill => ({ url: c.url, skill,
+            action: !courses.has(c.url) ? 'insert' : courses.get(c.url)!.skills.includes(skill) ? 'existing' : 'conflict' }))),
+        conflicts: 0,
+    };
+    report.conflicts = report.courses.filter(c => c.action === 'conflict').length;
+
+    return { document, report, skillIds, courses };
 }
