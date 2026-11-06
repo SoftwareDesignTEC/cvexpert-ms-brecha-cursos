@@ -1,5 +1,8 @@
 # Importación administrativa local de requisitos de mercado
 
+Para la revisión administrativa separada de Azure, ver [procedimiento de solo lectura](admin-import.md).
+Las restricciones locales de esta CLI siguen vigentes.
+
 La herramienta está implementada exclusivamente para PostgreSQL local de
 desarrollo/pruebas. No es un endpoint, no acredita fuentes y no habilita el
 análisis HTTP. Usa la tabla de la migración 002 sin modificar su esquema.

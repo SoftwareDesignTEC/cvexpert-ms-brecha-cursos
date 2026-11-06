@@ -1,5 +1,8 @@
 # Importación administrativa local de catálogo
 
+Para la revisión administrativa separada de Azure, ver [procedimiento de solo lectura](admin-import.md).
+Las restricciones locales de esta CLI siguen vigentes.
+
 Esta CLI permite preparar y revisar habilidades, cursos y relaciones en PostgreSQL
 17 **local y desechable/de desarrollo**, usando las tablas de la migración 001.
 No es un endpoint ni una funcionalidad desplegada. No habilita `/skills-gap` real,
