@@ -2,11 +2,39 @@ import type { Pool } from 'pg';
 import { createDatabasePool } from '../db/pool.js';
 import type { MarketRequirement } from '../domain/skills-gap.js';
 import type { CatalogCourse } from '../models/courses.js';
+import type { UserSkill } from '../domain/skills-gap.js';
 
 export interface AnalysisSnapshot { requirements: MarketRequirement[]; courses: CatalogCourse[] }
 export interface SkillsGapRepository {
     loadMarket(marketKey: string): Promise<AnalysisSnapshot>;
     close(): Promise<void>;
+}
+
+export interface UserSkillsRepository {
+    replace(subjectHash: string, skills: readonly UserSkill[]): Promise<void>;
+    load(subjectHash: string): Promise<UserSkill[] | null>;
+    close(): Promise<void>;
+}
+
+export function createPostgresUserSkillsRepository(poolFactory: () => Pool = createDatabasePool): UserSkillsRepository {
+    let pool: Pool | undefined;
+    return {
+        async replace(subjectHash, skills) {
+            pool ??= poolFactory();
+            // Un único UPSERT: reemplazo completo atómico, sin pérdidas entre DELETE/INSERT.
+            await pool.query(`INSERT INTO public.user_skill_snapshots (subject_hash, adapter_key, skills)
+                VALUES ($1, 'cv-skill-v1', $2::jsonb)
+                ON CONFLICT (subject_hash) DO UPDATE SET adapter_key = EXCLUDED.adapter_key, skills = EXCLUDED.skills`,
+            [subjectHash, JSON.stringify(skills)]);
+        },
+        async load(subjectHash) {
+            pool ??= poolFactory();
+            const result = await pool.query<{ skills: UserSkill[] }>(
+                `SELECT skills FROM public.user_skill_snapshots WHERE subject_hash = $1 AND adapter_key = 'cv-skill-v1'`, [subjectHash]);
+            return result.rows[0]?.skills ?? null;
+        },
+        async close() { await pool?.end(); pool = undefined; },
+    };
 }
 
 // Una sola instantánea SELECT; no consulta usuarios, no persiste análisis y no

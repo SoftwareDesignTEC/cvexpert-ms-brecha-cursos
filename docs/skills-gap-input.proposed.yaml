@@ -3,7 +3,8 @@ info:
   title: CVExpert - Propuesta de entrada privada para Brecha
   version: 0.0.1-proposed
   description: |
-    PROPUESTA NO IMPLEMENTADA NI APROBADA. Documento separado del contrato activo.
+    PROPUESTA HISTÓRICA NO APROBADA. No representa el flujo implementado en 0.2.0.
+    Ver openapi.yaml y docs/skills-gap-http.md para diferencias y ratificación pendiente.
     No habilita rutas, autenticación ni cambios en GET /skills-gap.
     Requiere identidad comprobada de APIM, certificados y bloqueo del acceso directo.
 paths:

@@ -1,42 +1,36 @@
 # Pruebas HTTP de Brecha/Cursos
 
-Importar `brecha-cursos.postman_collection.json` y uno de los entornos de ejemplo
-en Postman. Todos los valores son de ejemplo; guardar el token real únicamente
-en el entorno privado del cliente. La colección no envía identidad de usuario
-ni certificados reenviados.
+Importar la colección y el entorno apropiado. El contrato 0.2.0 está implementado
+para revisión; no demuestra integración productiva. No guardar tokens reales en Git.
 
-En local: completar `.env`, habilitar `APIM_ALLOW_INSECURE_LOCAL=true` con
-`NODE_ENV=development` y ejecutar `npm run dev`. El catálogo necesita PostgreSQL
-configurado y migrado. El entorno local espera 200 con datos demo en la brecha.
-Las pruebas comprueban salud, esquema y paginación del catálogo y la brecha,
-la marca `X-Data-Mode: demo` y el error 400 de paginación inválida.
+Las peticiones de GET usan expectedGapStatus: 409 sin instantánea, 200 con instantánea
+incluso si falta mercado, 503 sin contexto de servidor o base disponible. También 401
+sin identidad y 403 sin certificado autorizado. Cambiar ese valor solo para verificar
+el estado esperado de una prueba concreta. Un mock APIM 200 no demuestra integración:
+con 200 la colección exige analysis, escala y cobertura; no acepta el esquema demo.
 
-En APIM: el gateway documentado es
-`https://gabriel-api-management.azure-api.net/api/v1`. Completar `healthPath`,
-`coursesPath` y `skillsGapPath` con las rutas públicas **confirmadas**, incluyendo
-la `/` inicial. No asumir equivalencia con las rutas internas `/health`,
-`/courses` y `/skills-gap`. Si el gateway no expone salud, ejecutar esa petición
-por separado contra el backend usando el entorno apropiado.
+PUT /skills-gap/input reemplaza la instantánea completa. La petición incluida usa
+skills: [] como cuerpo revisable: editarlo antes de ejecutarla. Devuelve 204; la
+colección lo comprueba. No ejecutar toda la colección inadvertidamente contra datos
+personales vigentes: el PUT es una escritura explícita. Después, GET comprueba esquema
+y cobertura (completa, incompleta o vacía), no supone recomendaciones disponibles.
+Para probar duplicados o etiquetas desconocidas, duplicar un nombre o usar otro nivel:
+debe dar 400 sin reemplazar la instantánea. Con otra identidad verificada sin entrada,
+GET debe dar 409. Ver casos reproducibles automatizados en test/app.test.ts y test/db.
 
-La operación de brecha de APIM sigue conectada a un mock. El entorno APIM espera
-503 con `SKILLS_GAP_UNAVAILABLE`, la respuesta del backend productivo autenticado.
-Un mock 200 hará fallar esta prueba y no demuestra integración. No cambiar
-`expectedGapStatus` a 200 para dar por conectado el backend: ese valor solo
-corresponde a la demo local. Un 403 o `APIM_SECURITY_UNAVAILABLE` tampoco cuenta
-como éxito funcional. `/courses` debe devolver 200 con su esquema real; un 503
-por PostgreSQL indisponible hace fallar la prueba.
+Completar baseUrl, healthPath, coursesPath, skillsGapPath y skillsGapInputPath con las
+rutas **confirmadas** del entorno. El entorno APIM deja la ruta PUT vacía porque todavía
+no está confirmada; no la inventa ni modifica el gateway. La colección no envía X-User-Id,
+X-User-Email ni X-ARR-ClientCert. APIM debe validar la autenticación del usuario,
+sobrescribir identidad y presentar el certificado TLS a App Service. El Bearer del
+entorno representa el mecanismo aceptado por APIM; el backend no valida JWT.
 
-`token` representa el Bearer aceptado por la política de identidad de APIM;
-confirmar dicha política y cualquier requisito de suscripción con el equipo.
-No se presupone que el backend valide JWT. APIM debe presentar su certificado
-en la conexión TLS hacia App Service. No enviar `X-ARR-ClientCert` manualmente
-como sustituto de mTLS.
+El bypass local de catálogo no permite este flujo. En local, Postman directo obtiene
+403 para brechas aunque catálogo/health funcionen con bypass. Para el flujo completo
+usar el harness automatizado con certificados públicos de fixture e identidades de
+prueba: npm test; npm run db:test sobre PostgreSQL 17 local. No enviar el certificado
+reenviado como sustituto de mTLS al gateway. Las pruebas locales no verifican TLS Azure.
 
-Ejecución opcional con Newman instalado:
-
-```sh
-newman run postman/brecha-cursos.postman_collection.json -e postman/local.postman_environment.json
-```
-
-Los filtros opcionales del catálogo pueden añadirse con `platform`, `isPaid` y
-`skillName`, sin modificar sus reglas de validación. `baseUrl` no lleva `/` final.
+APIM sigue usando mocks; no sustituirlos como parte de este cambio. Confirmar integración
+real en un trabajo autorizado posterior. Catálogo conserva sus filtros y contrato.
+Ver [flujo, compatibilidad y requisitos productivos](../docs/skills-gap-http.md).

@@ -35,7 +35,7 @@ async function freePort() {
 
 async function smokeTest(directory, authenticated = false) {
     const certificate = new X509Certificate(await readFile(new URL('../../test/fixtures/certificates/valid.pem', import.meta.url)));
-    const headers = authenticated ? { 'X-ARR-ClientCert': certificate.raw.toString('base64') } : {};
+    const headers = authenticated ? { 'X-ARR-ClientCert': certificate.raw.toString('base64'), 'X-User-Id': 'package-test-user' } : {};
     const request = url => fetch(url, { headers, signal: AbortSignal.timeout(1000) });
     const port = await freePort();
     // Intentionally do not inherit PG*, Azure, GitHub tokens or the workspace .env.
@@ -65,8 +65,14 @@ async function smokeTest(directory, authenticated = false) {
         assert.ok(response, `Packaged server did not become healthy: ${output}`);
         assert.equal(response.status, 200);
         assert.deepEqual(await response.json(), { status: 'ok', service: 'brecha-cursos' });
-        const demo = await request(`http://127.0.0.1:${port}/skills-gap`);
-        assert.equal(demo.status, 503, 'Production must not publish demo recommendations.');
+        const gaps = await request(`http://127.0.0.1:${port}/skills-gap`);
+        assert.equal(gaps.status, 503, 'Missing server market configuration must fail closed.');
+        if (authenticated) {
+            const noIdentity = await fetch(`http://127.0.0.1:${port}/skills-gap`, {
+                headers: { 'X-ARR-ClientCert': headers['X-ARR-ClientCert'] }, signal: AbortSignal.timeout(1000),
+            });
+            assert.equal(noIdentity.status, 401);
+        }
         // The package must start without PG configuration; requesting the catalog
         // fails safely and must not make health unavailable.
         const courses = await request(`http://127.0.0.1:${port}/courses`);

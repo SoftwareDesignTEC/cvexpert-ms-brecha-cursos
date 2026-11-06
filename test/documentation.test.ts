@@ -17,7 +17,7 @@ test('contrato activo: referencias resolubles, seguridad y solo operaciones impl
         }
     };
     visit(specification);
-    assert.deepEqual(Object.keys(specification.paths).sort(), ['/courses', '/health', '/skills-gap']);
+    assert.deepEqual(Object.keys(specification.paths).sort(), ['/courses', '/health', '/skills-gap', '/skills-gap/input']);
     assert.deepEqual(specification.paths['/health'].get.security, []);
     assert.equal(specification.security, undefined);
     assert.equal(specification.components.securitySchemes, undefined);
