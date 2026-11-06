@@ -1,21 +1,30 @@
 openapi: 3.0.3
 info:
   title: CVExpert - Brecha de habilidades y cursos
-  version: 0.1.0
-  description: |
-    Contrato activo del backend. GET /courses consulta PostgreSQL y GET /skills-gap
-    sigue en modo demo solo en development/test; en producción responde 503.
-    APIM está configurado por separado y su operación de brecha todavía usa un mock.
-    Las rutas públicas pueden diferir: no se declara el gateway como servidor equivalente.
-    Negocio y documentación requieren certificado APIM validado por el backend;
-    /health queda excluido. La identidad X-User-Id/X-User-Email debe ser validada
-    y sobrescrita por APIM. No basta con enviar esos encabezados.
-    La autenticación del usuario pertenece a APIM; el backend no verifica tokens Google.
-    APIM se autentica ante App Service con certificado TLS, no con una API key.
-    X-ARR-ClientCert es un encabezado interno reenviado por App Service; el consumidor
-    no debe introducirlo manualmente. Ver las extensiones x-apim-user-authentication
-    y x-backend-authentication para las dos fronteras de confianza.
+  version: 0.2.0
+  description: >
+    Contrato activo del backend. GET /courses consulta PostgreSQL y GET /skills-gap usa instantáneas
+    autenticadas y el motor ordinal.
 
+    APIM está configurado por separado y su operación de brecha todavía usa un mock.
+
+    Las rutas públicas pueden diferir: no se declara el gateway como servidor equivalente.
+
+    Negocio y documentación requieren certificado APIM validado por el backend;
+
+    /health queda excluido. La identidad X-User-Id/X-User-Email debe ser validada
+
+    y sobrescrita por APIM. No basta con enviar esos encabezados.
+
+    La autenticación del usuario pertenece a APIM; el backend no verifica tokens Google.
+
+    APIM se autentica ante App Service con certificado TLS, no con una API key.
+
+    X-ARR-ClientCert es un encabezado interno reenviado por App Service; el consumidor
+
+    no debe introducirlo manualmente. Ver las extensiones x-apim-user-authentication
+
+    y x-backend-authentication para las dos fronteras de confianza.
 paths:
   /health:
     get:
@@ -25,21 +34,25 @@ paths:
       summary: Consultar el estado del servicio
       description: Endpoint implementado; devuelve el estado y el nombre del servicio.
       responses:
-        '200':
+        "200":
           description: El servicio responde correctamente.
           content:
             application/json:
               schema:
                 type: object
                 additionalProperties: false
-                required: [ status, service ]
+                required:
+                  - status
+                  - service
                 properties:
                   status:
                     type: string
-                    enum: [ ok ]
+                    enum:
+                      - ok
                   service:
                     type: string
-                    enum: [ brecha-cursos ]
+                    enum:
+                      - brecha-cursos
               example:
                 status: ok
                 service: brecha-cursos
@@ -50,19 +63,23 @@ paths:
         - Brecha de habilidades
       operationId: getSkillsGap
       summary: Consultar brechas de habilidades y cursos sugeridos
-      description: |
-        Devuelve datos ficticios etiquetados [DEMO], sin recomendaciones reales
-        ni consulta de identidad o uso del motor interno de brechas. Solo está
-        habilitado con NODE_ENV=development o test; en producción devuelve 503.
-        Exige el mismo certificado APIM que el catálogo. La identidad de usuario
-        debe validarse y sobrescribirse en APIM antes de una futura integración.
-        Los niveles ilustrativos no establecen una escala definitiva.
+      description: "Analiza exclusivamente la instantánea del usuario identificado por APIM tras verificar su
+        certificado. No admite bypass local de identidad. Solo acepta page y pageSize; otros parámetros son
+        400. Escala fija cv-skill-v1: beginner=1, intermediate=2, advanced=3, expert=4; son posiciones
+        ordinales, nunca porcentajes. El servidor selecciona SKILLS_GAP_MARKET_KEY; sin configuración responde
+        503. Sin instantánea responde 409. Sin requisitos devuelve 200, analysis.marketStatus=missing y
+        cobertura empty/incomplete, nunca cumplimiento demostrado. Los resultados parciales incluyen
+        unresolved de todo el análisis (no paginado). totalRecords cuenta únicamente brechas calculables;
+        items vacío no prueba ausencia de brechas. Orden por déficit descendente y nombre exacto ascendente.
+        Cursos por asociación exacta y asignación global única, orden ID numérico, sin afirmar calidad ni
+        eficacia. Cada petición usa la instantánea vigente; no hay estabilidad entre peticiones concurrentes.
+        Duración desconocida se conserva null. Cambios respecto al demo requieren ratificación y validación de
+        Web/Android antes de activar; no cambia sus APIs en este PR."
       parameters:
         - in: query
           name: page
           required: false
-          description: Entero positivo seguro en base 10, comenzando en 1. Una página fuera de rango devuelve
-            items vacío.
+          description: Entero positivo seguro en base 10, comenzando en 1. Una página fuera de rango devuelve items vacío.
           schema:
             type: integer
             minimum: 1
@@ -70,74 +87,63 @@ paths:
         - in: query
           name: pageSize
           required: false
-          description: Número máximo de brechas por página. Entero en base 10; no acepta decimales, signos,
-            espacios, notación exponencial ni valores múltiples.
+          description: Número máximo de brechas por página. Entero en base 10; no acepta decimales, signos, espacios,
+            notación exponencial ni valores múltiples.
           schema:
             type: integer
             minimum: 1
             maximum: 100
             default: 20
       responses:
-        '200':
-          description: Datos ficticios de demostración; no son recomendaciones reales.
+        "200":
+          description: Página de brechas reales calculables y metadatos de cobertura, incluso cuando falta mercado.
           headers:
             X-Data-Mode:
-              description: Identifica explícitamente el origen ficticio de los datos.
+              description: Origen persistente; no certifica cobertura completa.
               schema:
                 type: string
-                enum: [ demo ]
+                enum:
+                  - reference
             Cache-Control:
               schema:
                 type: string
-                enum: [ no-store ]
+                enum:
+                  - no-store
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SkillsGapPage'
-              example:
-                items:
-                  - skillName: '[DEMO] SQL'
-                    userLevel: 40
-                    marketLevel: 80
-                    courses:
-                      - id: demo-course-1
-                        title: '[DEMO] Curso ficticio de SQL'
-                        url: https://example.org/demo/courses/1
-                        platform: Plataforma ficticia de demostración
-                        logoUrl: null
-                        durationHours: 8
-                page: 1
-                pageSize: 20
-                totalRecords: 1
-        '400':
-          description: Parámetros de paginación inválidos.
+                $ref: "#/components/schemas/SkillsGapPage"
+        "400":
+          description: Paginación inválida o parámetros no permitidos.
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - error
-                  - message
-                properties:
-                  error:
-                    type: string
-                    enum:
-                      - INVALID_PAGINATION
-                  message:
-                    type: string
-        '503':
-          description: Seguridad sin configurar o funcionalidad demo bloqueada fuera de development/test.
+                $ref: "#/components/schemas/SkillsGapError"
+        "401":
+          description: Identidad APIM ausente, múltiple o inválida.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UnavailableError"
-        "403":
+                $ref: "#/components/schemas/SkillsGapError"
+        "403": &a1
           description: Certificado ausente, malformado, fuera de vigencia o no autorizado.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/CertificateError"
-
+        "409":
+          description: "SKILLS_INPUT_REQUIRED: no hay instantánea; guardar mediante PUT."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
+        "503":
+          description: Seguridad, contexto de servidor, base de datos o datos de análisis no disponibles o inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
+      x-implementation-status: implemented-pending-contract-ratification
   /courses:
     get:
       tags:
@@ -206,7 +212,7 @@ paths:
           schema:
             type: string
             minLength: 1
-          example: '[DEMO] Plataforma ficticia'
+          example: "[DEMO] Plataforma ficticia"
         - in: query
           name: isPaid
           required: false
@@ -229,28 +235,29 @@ paths:
           schema:
             type: string
             minLength: 1
-          example: '[DEMO] SQL'
+          example: "[DEMO] SQL"
       responses:
-        '200':
-          description: 'Propuesta: página de cursos del catálogo; no es una lista de recomendaciones
-            personalizadas.'
+        "200":
+          description: "Propuesta: página de cursos del catálogo; no es una lista de recomendaciones personalizadas."
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CoursesPage'
+                $ref: "#/components/schemas/CoursesPage"
               examples:
                 demoUnknownDuration:
                   summary: Ejemplo ficticio con duración desconocida
                   value:
                     items:
-                      - id: '2'
-                        title: '[DEMO] Curso ficticio de backend'
+                      - id: "2"
+                        title: "[DEMO] Curso ficticio de backend"
                         url: https://example.org/cvexpert-demo/backend
-                        platform: '[DEMO] Plataforma ficticia'
+                        platform: "[DEMO] Plataforma ficticia"
                         logoUrl: null
                         durationHours: null
                         isPaid: true
-                        skills: [ '[DEMO] SQL', '[DEMO] TypeScript' ]
+                        skills:
+                          - "[DEMO] SQL"
+                          - "[DEMO] TypeScript"
                     page: 1
                     pageSize: 20
                     totalRecords: 1
@@ -261,42 +268,94 @@ paths:
                     page: 2
                     pageSize: 20
                     totalRecords: 1
-        '400':
-          description: Parámetros de paginación o filtros inválidos. Formato implementado pendiente de
-            ratificación.
+        "400":
+          description: Parámetros de paginación o filtros inválidos. Formato implementado pendiente de ratificación.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CatalogError'
+                $ref: "#/components/schemas/CatalogError"
               example:
                 error: INVALID_QUERY
                 message: Parámetros de consulta inválidos.
-        '503':
-          description: Seguridad sin configurar o catálogo temporalmente no disponible; sin detalles internos.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UnavailableError"
         "403":
           description: Certificado ausente, malformado, fuera de vigencia o no autorizado.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/CertificateError"
-
+        "503":
+          description: Seguridad sin configurar o catálogo temporalmente no disponible; sin detalles internos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnavailableError"
+  /skills-gap/input:
+    put:
+      tags:
+        - Brecha de habilidades
+      operationId: replaceSkillsGapInput
+      summary: Reemplazar instantánea del usuario autenticado
+      x-implementation-status: implemented-pending-contract-ratification
+      description: Reemplazo atómico e idempotente de la única instantánea vigente. Identidad exclusivamente de
+        X-User-Id inyectado por APIM bajo certificado verificado. No acepta userId, marketKey, scaleKey ni
+        propiedades adicionales. No persiste correo, CV ni tokens. El bypass local del catálogo no autoriza
+        esta ruta. Límite JSON global 100 KiB; 500 habilidades. Retención y aceptación de autoevaluaciones
+        pendientes de ratificación antes de producción.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SkillsGapInput"
+            example:
+              skills:
+                - skillName: SQL
+                  level: beginner
+      responses:
+        "204":
+          description: Instantánea reemplazada; no implica análisis completo ni recomendaciones.
+        "400":
+          description: JSON o entrada inválida, duplicados, nivel desconocido o propiedades no permitidas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
+        "401":
+          description: Identidad APIM ausente o inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
+        "403": *a1
+        "413":
+          description: Cuerpo supera 100 KiB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
+        "503":
+          description: Seguridad o persistencia no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
 components:
   schemas:
     CoursesPage:
       type: object
-      description: Página del catálogo implementada conforme al borrador, pendiente de ratificación;
-        independiente de SkillsGapPage.
-      required: [ items, page, pageSize, totalRecords ]
+      description: Página del catálogo implementada conforme al borrador, pendiente de ratificación; independiente
+        de SkillsGapPage.
+      required:
+        - items
+        - page
+        - pageSize
+        - totalRecords
       properties:
         items:
           type: array
           description: Cursos únicos de esta página, ordenados por ID SQL ascendente.
           items:
-            $ref: '#/components/schemas/CatalogCourse'
+            $ref: "#/components/schemas/CatalogCourse"
         page:
           type: integer
           minimum: 1
@@ -309,14 +368,21 @@ components:
           type: integer
           minimum: 0
           description: Total de cursos únicos después de filtrar y antes de paginar.
-
     CatalogCourse:
       type: object
       description: |
         Curso del catálogo implementado conforme al borrador, pendiente de ratificación; independiente de
         CourseSuggestion. Añade isPaid y skills; permite durationHours null.
         No representa afinidad con un usuario ni una recomendación.
-      required: [ id, title, url, platform, logoUrl, durationHours, isPaid, skills ]
+      required:
+        - id
+        - title
+        - url
+        - platform
+        - logoUrl
+        - durationHours
+        - isPaid
+        - skills
       properties:
         id:
           type: string
@@ -325,7 +391,7 @@ components:
             Propuesta de mapeo: String(courses.id), representación decimal
             del entero SQL, sin cambiar la PK ni añadir prefijos o UUID.
             Pendiente de aprobación; no restringe los IDs de CourseSuggestion.
-          example: '2'
+          example: "2"
         title:
           type: string
           description: Título del curso; corresponde a courses.title.
@@ -345,10 +411,8 @@ components:
           type: integer
           minimum: 0
           nullable: true
-          description: |
-            duration_hours; null significa desconocida, nunca se sustituye por 0.
-            La propiedad siempre está presente en esta propuesta. No modifica
-            durationHours obligatorio y no nullable de CourseSuggestion.
+          description: duration_hours; null significa desconocida y nunca se sustituye por cero. También se conserva en
+            sugerencias.
         isPaid:
           type: boolean
           description: courses.is_paid; no incorpora información de precios.
@@ -360,57 +424,140 @@ components:
             Se propone un arreglo vacío si el curso no tiene habilidades asociadas.
           items:
             type: string
-
     CatalogError:
       type: object
-      description: Formato de error del catálogo implementado, pendiente de ratificación. No modifica
-        errores de otros endpoints.
-      required: [ error, message ]
+      description: Formato de error del catálogo implementado, pendiente de ratificación. No modifica errores de
+        otros endpoints.
+      required:
+        - error
+        - message
       properties:
         error:
           type: string
-          enum: [ INVALID_QUERY, CATALOG_UNAVAILABLE ]
+          enum:
+            - INVALID_QUERY
+            - CATALOG_UNAVAILABLE
         message:
           type: string
-
     SkillsGapPage:
       type: object
-      required: [ items, page, pageSize, totalRecords ]
+      required:
+        - items
+        - page
+        - pageSize
+        - totalRecords
+        - analysis
       properties:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/SkillGapItem'
+            $ref: "#/components/schemas/SkillGapItem"
         page:
           type: integer
           minimum: 1
+          maximum: 9007199254740991
         pageSize:
           type: integer
           minimum: 1
+          maximum: 100
         totalRecords:
           type: integer
           minimum: 0
-
+          description: Número de brechas calculables, antes de paginar; no cuenta unresolved.
+        analysis:
+          type: object
+          required:
+            - status
+            - comparedSkills
+            - scaleKey
+            - marketStatus
+            - unresolved
+          properties:
+            status:
+              type: string
+              enum:
+                - empty
+                - incomplete
+                - complete
+              description: "empty: ninguna habilidad en ambos conjuntos; incomplete: al menos una sin comparar; complete:
+                todos los nombres comparados. No expresa disponibilidad ni eficacia de cursos."
+            comparedSkills:
+              type: integer
+              minimum: 0
+            scaleKey:
+              type: string
+              enum:
+                - cv-skill-v1
+            marketStatus:
+              type: string
+              enum:
+                - missing
+                - available
+              description: available solo indica que existen filas; pueden ser incompatibles o tener niveles desconocidos.
+            unresolved:
+              type: array
+              items:
+                type: object
+                required:
+                  - skillName
+                  - reason
+                  - userLevel
+                  - marketLevel
+                properties:
+                  skillName:
+                    type: string
+                  reason:
+                    type: string
+                    enum:
+                      - MISSING_USER_SKILL
+                      - MISSING_MARKET_REQUIREMENT
+                      - UNKNOWN_LEVEL
+                      - UNKNOWN_SCALE
+                      - SCALE_MISMATCH
+                  userLevel:
+                    type: integer
+                    nullable: true
+                  marketLevel:
+                    type: integer
+                    nullable: true
     SkillGapItem:
       type: object
-      required: [ skillName, userLevel, marketLevel, courses ]
+      required:
+        - skillName
+        - userLevel
+        - marketLevel
+        - courses
+        - deficitSteps
       properties:
         skillName:
           type: string
         userLevel:
           type: integer
-          description: Nivel del usuario; escala aún por acordar con el equipo.
+          minimum: 1
+          maximum: 4
+          description: Posición ordinal cv-skill-v1, nunca porcentaje.
         marketLevel:
           type: integer
-          description: Nivel de mercado; escala aún por acordar con el equipo.
+          minimum: 1
+          maximum: 4
+          description: Posición ordinal cv-skill-v1, nunca porcentaje.
         courses:
           type: array
           items:
-            $ref: '#/components/schemas/CourseSuggestion'
-
+            $ref: "#/components/schemas/CourseSuggestion"
+        deficitSteps:
+          type: integer
+          minimum: 1
+          maximum: 3
     CourseSuggestion:
       type: object
-      required: [ id, title, url, platform, logoUrl, durationHours ]
+      required:
+        - id
+        - title
+        - url
+        - platform
+        - logoUrl
+        - durationHours
       properties:
         id:
           type: string
@@ -428,6 +575,14 @@ components:
         durationHours:
           type: integer
           minimum: 0
+          nullable: true
+          description: null significa duración desconocida; no se sustituye por cero. Cambio explícito respecto al demo.
+        isPaid:
+          type: boolean
+        skills:
+          type: array
+          items:
+            type: string
     CertificateError:
       type: object
       required:
@@ -454,27 +609,69 @@ components:
             - CATALOG_UNAVAILABLE
         message:
           type: string
+    SkillsGapInput:
+      type: object
+      additionalProperties: false
+      required:
+        - skills
+      properties:
+        skills:
+          type: array
+          maxItems: 500
+          description: Instantánea completa; [] vacía habilidades conocidas sin asignar nivel cero. Nombres exactos, sin
+            duplicados, incluso idénticos.
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - skillName
+              - level
+            properties:
+              skillName:
+                type: string
+                minLength: 1
+                maxLength: 200
+                description: Nombre exacto sin espacios extremos ni NUL. No se crean habilidades del catálogo.
+              level:
+                type: string
+                nullable: true
+                enum:
+                  - beginner
+                  - intermediate
+                  - advanced
+                  - expert
+                  - null
+                description: null es desconocido. Cualquier otra etiqueta o valor numérico produce 400.
+    SkillsGapError:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
 servers:
   - url: /
     description: Backend interno; confirmar las rutas y reescrituras de APIM antes de probar el gateway.
 x-apim-user-authentication:
   boundary: consumer-to-apim
-  description: APIM valida la identidad del usuario según su política y sobrescribe X-User-Id y
-    X-User-Email. El contrato del gateway debe definir su mecanismo de autenticación y sus rutas
-    públicas. Este backend no verifica tokens Google ni otros JWT.
+  description: APIM valida la identidad del usuario según su política y sobrescribe X-User-Id y X-User-Email. El
+    contrato del gateway debe definir su mecanismo de autenticación y sus rutas públicas. Este backend no
+    verifica tokens Google ni otros JWT.
 x-backend-authentication:
   type: mutualTLS
   boundary: apim-to-app-service
   description: APIM presenta el certificado cliente durante TLS. App Service lo exige y reenvía su
     representación al backend, que valida formato, vigencia y huella. OpenAPI 3.0 no dispone de un
-    securityScheme mutualTLS; esta extensión documenta el control sin representarlo como una
-    credencial HTTP del consumidor. La ausencia de securitySchemes no autoriza acceso anónimo al
-    backend.
+    securityScheme mutualTLS; esta extensión documenta el control sin representarlo como una credencial HTTP
+    del consumidor. La ausencia de securitySchemes no autoriza acceso anónimo al backend.
   certificateForwarding:
     header: X-ARR-ClientCert
     source: Azure App Service tras recibir el certificado cliente en la conexión TLS
     consumerSupplied: false
-    description: Encabezado interno de infraestructura. No introducirlo manualmente en Swagger ni
-      enviarlo desde el cliente como sustituto del certificado TLS.
+    description: Encabezado interno de infraestructura. No introducirlo manualmente en Swagger ni enviarlo desde
+      el cliente como sustituto del certificado TLS.
   excludedPaths:
     - /health

@@ -37,6 +37,7 @@ export function createApimCertificateGuard(environment: string | undefined, sett
             const to = Date.parse(certificate.validTo);
             if (!Number.isFinite(from) || !Number.isFinite(to) || now < from || now > to
                 || !allowed.has(certificate.fingerprint.replaceAll(':', '').toUpperCase())) throw new Error();
+            res.locals.apimCertificateVerified = true;
             next();
         } catch {
             res.status(403).json({ error: 'APIM_CERTIFICATE_REQUIRED', message: 'Certificado de cliente no autorizado.' });

@@ -18,8 +18,8 @@ const bootstrap = `
 const certificate = new X509Certificate(readFileSync(new URL('./fixtures/certificates/valid.pem', import.meta.url)));
 
 for (const scenario of [
-    { name: 'development con bypass', environment: 'development', bypass: 'true', host: '127.0.0.1', status: 200 },
-    { name: 'test con bypass', environment: 'test', bypass: 'true', host: '127.0.0.1', status: 200 },
+    { name: 'development con bypass', environment: 'development', bypass: 'true', host: '127.0.0.1', status: 403 },
+    { name: 'test con bypass', environment: 'test', bypass: 'true', host: '127.0.0.1', status: 403 },
     { name: 'development sin bypass', environment: 'development', host: '0.0.0.0', status: 503 },
     { name: 'production rechaza bypass', environment: 'production', bypass: 'true', host: '0.0.0.0', status: 503 },
     { name: 'production exige certificado aunque se pida bypass', environment: 'production', bypass: 'true', configured: true, host: '0.0.0.0', status: 403 },
@@ -54,12 +54,12 @@ for (const scenario of [
             } else if (scenario.status === 403) {
                 assert.equal((await response.json() as { error: string }).error, 'APIM_CERTIFICATE_REQUIRED');
                 const authenticated = await fetch(`http://127.0.0.1:${address.port}/skills-gap`, {
-                    headers: { 'X-ARR-ClientCert': certificate.raw.toString('base64') },
+                    headers: { 'X-ARR-ClientCert': certificate.raw.toString('base64'), 'X-User-Id': 'test-user' },
                 });
-                assert.equal(authenticated.status, 503);
-                assert.equal((await authenticated.json() as { error: string }).error, 'SKILLS_GAP_UNAVAILABLE');
-            } else {
-                assert.equal(response.headers.get('x-data-mode'), 'demo');
+                assert.equal(authenticated.status, scenario.configured ? 503 : 403);
+                assert.equal((await authenticated.json() as { error: string }).error, scenario.configured ? 'SKILLS_GAP_UNAVAILABLE' : 'APIM_CERTIFICATE_REQUIRED');
+            }
+            if (scenario.host === '127.0.0.1') {
                 const external = Object.values(networkInterfaces()).flat().find(entry =>
                     entry?.family === 'IPv4' && !entry.internal);
                 if (external) {

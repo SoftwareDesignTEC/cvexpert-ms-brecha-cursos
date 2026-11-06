@@ -12,23 +12,23 @@ const header = (name: string) => ({ 'X-ARR-ClientCert': certificates[name].raw.t
 const repository = { async findPage() { return { items: [], totalRecords: 0 }; } };
 const settings = { APIM_CERT_THUMBPRINTS: thumbprint('valid') };
 
-test('certificado X.509 correcto conserva courses, demo y documentación protegida', async () => {
+test('certificado X.509 correcto conserva courses, exige identidad y protege documentación', async () => {
     await withHttpApp(createApp('test', repository, settings), async url => {
         const init = { headers: header('valid') };
         const courses = await fetch(`${url}/courses`, init);
         assert.equal(courses.status, 200);
         assert.deepEqual(await courses.json(), { items: [], page: 1, pageSize: 20, totalRecords: 0 });
         const demo = await fetch(`${url}/skills-gap`, init);
-        assert.equal(demo.status, 200);
-        assert.equal(demo.headers.get('x-data-mode'), 'demo');
-        assert.equal((await demo.json() as { totalRecords: number }).totalRecords, 3);
+        assert.equal(demo.status, 401);
+        assert.equal(demo.headers.get('cache-control'), 'no-store');
+        assert.equal((await demo.json() as { error: string }).error, 'USER_IDENTITY_REQUIRED');
         for (const path of ['/docs', '/docs/', '/docs/swagger-ui.css', '/docs/swagger-ui-bundle.js', '/docs/init.js', '/openapi.yaml', '/openapi.json']) {
             const response = await fetch(`${url}${path}`, init);
             assert.equal(response.status, 200, path);
             assert.ok((await response.text()).length > 20, path);
         }
         const specification = await (await fetch(`${url}/openapi.json`, init)).json() as { paths: Record<string, unknown> };
-        assert.deepEqual(Object.keys(specification.paths).sort(), ['/courses', '/health', '/skills-gap']);
+        assert.deepEqual(Object.keys(specification.paths).sort(), ['/courses', '/health', '/skills-gap', '/skills-gap/input']);
     });
 });
 
@@ -56,12 +56,12 @@ test('rechaza certificados incorrectos, vencidos, futuros, ausentes y Base64/X.5
     }
 });
 
-test('rotación acepta ambas huellas y producción mantiene skills-gap en 503', async () => {
+test('rotación acepta ambas huellas y producción sin contexto mantiene skills-gap en 503', async () => {
     await withHttpApp(createApp('production', repository, {
         APIM_CERT_THUMBPRINTS: ` ${thumbprint('valid').toLowerCase()}, ${thumbprint('rotated')} `,
     }), async url => {
         for (const name of ['valid', 'rotated']) {
-            const init = { headers: header(name) };
+            const init = { headers: { ...header(name), 'X-User-Id': 'test-user' } };
             assert.equal((await fetch(`${url}/courses`, init)).status, 200);
             const gaps = await fetch(`${url}/skills-gap`, init);
             assert.equal(gaps.status, 503);
