@@ -58,7 +58,7 @@ test('planificadores compartidos: READ ONLY real, idempotencia y conflictos', as
         const target = { server: 'test.postgres.database.azure.com', database: String(owner.options.database),
             identity: 'cvexpert_admin_preview_test', port: (await owner.query('SELECT inet_server_port() AS port')).rows[0].port };
         await owner.query('GRANT USAGE ON SCHEMA public TO cvexpert_admin_preview_test');
-        await owner.query('GRANT SELECT ON public.skills, public.courses, public.course_skills, public.market_requirements, public.schema_migrations TO cvexpert_admin_preview_test');
+        await owner.query('GRANT SELECT ON public.skills, public.courses, public.course_skills, public.market_requirements, public.schema_migrations, public.admin_import_runs TO cvexpert_admin_preview_test');
         const config = { ...getDatabaseConfig(), database: target.database, user: target.identity,
             password: 'TEST-preview-only', ssl: { rejectUnauthorized: true, servername: target.server,
                 ca: await readFile(process.env.ADMIN_IMPORT_TEST_CA!, 'utf8') } };

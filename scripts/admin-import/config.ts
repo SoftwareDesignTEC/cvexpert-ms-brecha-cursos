@@ -23,7 +23,7 @@ export function administrativeConfig(target: Target, env: NodeJS.ProcessEnv): Po
     if (env.ADMIN_IMPORT_SERVER !== target.server || env.ADMIN_IMPORT_DATABASE !== target.database
         || env.ADMIN_IMPORT_IDENTITY !== target.identity || env.ADMIN_IMPORT_PORT !== String(target.port) || !env.ADMIN_IMPORT_PASSWORD
         || env.NODE_TLS_REJECT_UNAUTHORIZED === '0'
-        || env.WEBSITE_INSTANCE_ID || env.WEBSITE_SITE_NAME || env.GITHUB_ACTIONS) {
+        || env.WEBSITE_INSTANCE_ID || env.WEBSITE_SITE_NAME || env.GITHUB_ACTIONS || env.CI || env.TF_BUILD || env.BUILD_BUILDID || env.GITLAB_CI || env.JENKINS_URL) {
         throw new AdminImportError('La configuración no coincide con el destino revisado o no es una sesión administrativa aislada.');
     }
     return {
@@ -35,4 +35,13 @@ export function administrativeConfig(target: Target, env: NodeJS.ProcessEnv): Po
         application_name: 'cvexpert-admin-import-dry-run',
         options: '-c default_transaction_read_only=on -c search_path=pg_catalog -c lock_timeout=5000 -c idle_in_transaction_session_timeout=30000',
     };
+}
+
+export function applicationConfig(target: Target, env: NodeJS.ProcessEnv): PoolConfig {
+    const config = administrativeConfig(target, env);
+    if (target.identity.toLowerCase().split('@')[0] === 'cvexpert_pgadmin') {
+        throw new AdminImportError('Se requiere identidad limitada; pgadmin prohibido.');
+    }
+    return { ...config, application_name: 'cvexpert-admin-import-apply',
+        options: config.options!.replace('default_transaction_read_only=on', 'default_transaction_read_only=off') };
 }

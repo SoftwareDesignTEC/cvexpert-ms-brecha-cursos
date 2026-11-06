@@ -64,12 +64,14 @@ export async function importMarketRequirements(pool: Pool, value: unknown, scale
 }
 
 // Shared query-only planner. Never changes transaction mode or executes DML.
-export async function planMarketRequirements(client: PoolClient, value: unknown, scale: LevelScale) {
+export async function planMarketRequirements(client: PoolClient, value: unknown, scale: LevelScale, pendingSkills: readonly string[] = []) {
     const document = parseImportDocument(value, scale);
     const skills = await client.query<{ id: number; name: string }>(
         'SELECT id, name FROM public.skills WHERE name = ANY($1::text[])', [document.records.map(row => row.skillName)]);
     const ids = new Map(skills.rows.map(row => [row.name, row.id]));
-    if (document.records.some(row => !ids.has(row.skillName))) throw new MarketImportError('El lote contiene habilidades inexistentes; no se crean automáticamente.');
+    // Solo el coordinador administrativo propone habilidades declaradas por catálogo.
+    // Los importadores locales no pasan pendingSkills y conservan su restricción.
+    if (document.records.some(row => !ids.has(row.skillName) && !pendingSkills.includes(row.skillName))) throw new MarketImportError('El lote contiene habilidades inexistentes; no se crean automáticamente.');
     const existing = await client.query<StoredRecord & { preciseDate: boolean }>(`SELECT
         r.market_key AS "marketKey", s.name AS "skillName", r.scale_key AS "scaleKey",
         r.required_level AS "requiredLevel", r.source_reference AS "sourceReference",
