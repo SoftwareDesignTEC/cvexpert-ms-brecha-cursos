@@ -1,4 +1,8 @@
-# Núcleo de Brecha: implementado; integración HTTP pendiente
+# Núcleo de Brecha: diseño y evidencia histórica
+
+> Este documento conserva el diagnóstico anterior al flujo HTTP. Las secciones de
+> integración pendiente y decisiones son antecedentes, no describen el estado actual.
+> Ver [implementación HTTP 0.2.0 y decisiones pendientes de activación](skills-gap-http.md).
 
 ## Evidencia y límites del contrato (29-10-2026)
 

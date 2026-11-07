@@ -5,8 +5,7 @@ export class AnalysisUnavailable extends Error {
     constructor() { super('El análisis no está disponible temporalmente.'); }
 }
 
-// Uso interno exclusivamente: todavía no existe una frontera HTTP autenticada
-// ni un contrato aprobado para obtener las habilidades y su escala.
+// El llamador HTTP resuelve identidad, contexto y escala en el servidor.
 export function createSkillsGapAnalysisService(repository: SkillsGapRepository) {
     return {
         async analyze(marketKey: string, scale: LevelScale, userSkills: readonly UserSkill[]) {
@@ -14,7 +13,8 @@ export function createSkillsGapAnalysisService(repository: SkillsGapRepository) 
             let snapshot;
             try { snapshot = await repository.loadMarket(marketKey); }
             catch { throw new AnalysisUnavailable(); }
-            return analyzeSkillsGap({ scale, userSkills, ...snapshot });
+            return { ...analyzeSkillsGap({ scale, userSkills, ...snapshot }),
+                marketStatus: snapshot.requirements.length === 0 ? 'missing' as const : 'available' as const };
         },
     };
 }

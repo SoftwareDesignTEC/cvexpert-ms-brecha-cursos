@@ -1,6 +1,10 @@
 # cvexpert-ms-brecha-cursos
 Microservicio de brecha de habilidades y recomendación de cursos de CVExpert
 
+Importación administrativa **solo local**, con dry-run predeterminado y revisión
+de conflictos: [catálogo de cursos y habilidades](docs/catalog-import.md).
+No es una funcionalidad HTTP desplegada ni habilita cargas a Azure.
+
 ## Ejecución local
 
 Requiere Node.js 24 y npm. Instalar dependencias con `npm ci`, copiar
@@ -15,69 +19,40 @@ cada servidor de prueba usa un puerto temporal en loopback y se cierra al finali
 `npm run build` comprueba tipos y genera los archivos de producción en `dist`.
 Los tests TypeScript se ejecutan con `tsx` y no se incluyen en `dist`.
 
-## Primera versión de skills-gap: solo demostración
+## Flujo HTTP de análisis de brechas
 
-- `GET /health` devuelve `{ "status": "ok", "service": "brecha-cursos" }`.
-- `GET /skills-gap?page=1&pageSize=20` devuelve `items`, `page`, `pageSize`
-  y `totalRecords`. Hay tres registros ficticios en orden fijo.
-- `page` y `pageSize` son opcionales e independientes: valores predeterminados
-  1 y 20. Deben ser enteros positivos seguros; `pageSize` tiene máximo 100.
-  Se rechazan valores vacíos, decimales, signos, espacios, notación exponencial,
-  parámetros repetidos, arreglos y objetos con HTTP 400. Los parámetros ajenos
-  a la paginación se ignoran.
-- Una página posterior al último registro devuelve HTTP 200 e `items: []`,
-  conservando el total de registros, independiente del tamaño de página.
+PUT /skills-gap/input reemplaza la instantánea del usuario autenticado por APIM.
+GET /skills-gap reutiliza el motor ordinal y PostgreSQL, conserva la paginación y
+expone cobertura explícita. Escala cv-skill-v1: beginner=1, intermediate=2,
+advanced=3, expert=4; nunca porcentajes. El contexto se configura en el servidor
+con SKILLS_GAP_MARKET_KEY, sin default ficticio. Ambas rutas exigen certificado
+APIM validado e identidad; el bypass local del catálogo no las autoriza.
 
-La ruta solo está habilitada con `NODE_ENV=development` o `NODE_ENV=test`.
-En producción, sin `NODE_ENV` o con cualquier otro valor devuelve HTTP 503,
-sin registros. `/health` continúa disponible. Configurar correctamente
-`NODE_ENV=production` al desplegar; no usar el `.env` local en producción.
+Contrato 0.2.0 implementado para revisión, pendiente de ratificación con clientes.
+Se admite durationHours null y se añaden analysis/deficitSteps: validar Web/Android
+antes de activar. Sin entrada: 409; sin contexto/DB: 503; sin mercado: 200 con
+cobertura incompleta/vacía explícita, nunca niveles o recomendaciones inventados.
+No hay mercado ni cursos productivos cargados por este cambio.
 
-Las habilidades y títulos llevan `[DEMO]`, los enlaces apuntan a `example.org`
-y la respuesta incluye `X-Data-Mode: demo` y `Cache-Control: no-store`.
-Los números de nivel son ilustrativos: la escala sigue pendiente de acuerdo.
-No hay análisis de usuarios, demanda real ni recomendaciones auténticas.
-React y Android deben mostrar el carácter demostrativo de estos registros;
-las etiquetas del cuerpo permiten reconocerlo incluso sin leer encabezados.
+Ver [contrato, decisiones revisables, persistencia, pruebas y lista de activación
+productiva](docs/skills-gap-http.md). La [propuesta anterior](docs/skills-gap-input.proposed.yaml)
+es histórica, no aprobada: sus scaleKey/marketKey y niveles numéricos de entrada
+no son el contrato implementado. OpenAPI activo: openapi.yaml; Swagger protegido
+en /docs/. No se despliega ni modifica Azure/APIM, sus mocks o APIs de clientes.
 
 ## Organización
 
-El núcleo real de cálculo y su repositorio PostgreSQL están implementados y
-probados de forma independiente; **GET `/skills-gap` todavía usa exclusivamente
-el comportamiento demo descrito arriba**. Ver [diseño, evidencia de consumidores,
-permisos y decisiones de integración pendientes](docs/skills-gap-domain.md) y la
-[propuesta OpenAPI no implementada de entrada](docs/skills-gap-input.proposed.yaml).
-La migración `002_create_market_requirements.sql` añade requisitos con procedencia
-y escala versionada nullable, sin cargar mercado ficticio ni fijar escala 0–100.
-Aplicarla solo en local con `npm run db:migrate` como mantenedor; conceder al rol
-HTTP únicamente SELECT sobre la tabla nueva. Este PR no ejecuta nada en Azure.
+- src/domain/cv-skill-v1.ts adapta niveles textuales o null a posiciones ordinales.
+- src/domain/skills-gap.ts conserva el motor de comparación y selección existente.
+- src/controllers/skills-gap.controller.ts exige identidad verificada y valida HTTP.
+- src/repositories/skills-gap.repository.ts lee mercado/cursos y guarda instantáneas.
+- db/migrations/003_create_user_skill_snapshots.sql añade almacenamiento sin historial.
+- test/app.test.ts y test/db/user-skill-snapshots.test.ts verifican el flujo y aislamiento.
 
-El [importador administrativo local](docs/market-import.md) valida archivos JSON
-revisados y calcula un dry-run con `npm run db:market:import -- --file <archivo>
---scale <escala>`. Solo escribe con `--apply`; las actualizaciones requieren
-además `--allow-updates` y una observación posterior. Usa credenciales de
-mantenimiento en loopback y development/test, nunca el rol HTTP. No carga datos
-al iniciar el backend y no incorpora el importador al ZIP de producción.
-
-- `src/app.ts`: construye Express y conserva `/health`, sin abrir puertos.
-- `src/server.ts`: carga `.env` y abre el servidor HTTP.
-- `src/routes/skills-gap.routes.ts`: registra la ruta.
-- `src/controllers/skills-gap.controller.ts`: controla disponibilidad,
-  valida query strings y traduce el resultado a HTTP.
-- `src/services/skills-gap.service.ts`: tipos del contrato y paginación
-  de datos ficticios, sin dependencia de Express.
-- `test/app.test.ts`: pruebas HTTP de salud, contrato, paginación,
-  parámetros inválidos y bloqueo de demostración.
-
-`openapi.yaml` documenta los tres endpoints activos y el modo demo. Swagger UI
-está disponible en `/docs/`, con contrato en `/openapi.yaml` y `/openapi.json`.
-Negocio y documentación exigen certificado APIM; `/health` queda independiente.
-Ver [seguridad y propuesta de despliegue](docs/apim-security.md) y
-[colección Postman y entornos de ejemplo](postman/README.md). La identidad de
-usuario debe validarse y sobrescribirse en APIM; no se autoriza por encabezados
-de identidad enviados por el cliente. La integración real sigue pendiente.
-No se ha modificado Azure ni Service Bus. El catálogo PostgreSQL descrito
-abajo es independiente del endpoint demo: `/skills-gap` no consulta la base.
+El [importador administrativo local de mercado](docs/market-import.md) y el de
+[catálogo](docs/catalog-import.md) siguen separados del HTTP y no se ejecutan al arrancar.
+Ninguna ruta llama directamente a otros microservicios. El diseño del motor y la
+evidencia histórica de consumidores están en [skills-gap-domain.md](docs/skills-gap-domain.md).
 
 ## Contrato del catálogo — implementado, pendiente de ratificación
 
@@ -90,11 +65,11 @@ no se atribuyen aquí otros requisitos a ellos.
 | Contrato o capacidad | Estado comprobado |
 | --- | --- |
 | `GET /health` | Implementado y documentado en OpenAPI. |
-| `GET /skills-gap` y cursos sugeridos | Implementado solo con datos demo en development/test; bloqueado en otros entornos. |
+| `GET /skills-gap` y cursos sugeridos | Motor conectado a instantáneas APIM; contrato 0.2.0 pendiente de ratificación, sin activación productiva. |
 | `page` y `pageSize` en `/skills-gap` | Implementados; nombres, valores predeterminados, límites y esquemas existentes se conservan. |
 | Catálogo PostgreSQL | Esquema, migraciones y seed opcional implementados; consultado por `/courses`. |
 | `GET /courses`, filtros y esquemas `CoursesPage`/`CatalogCourse` | Implementados conforme al borrador; sus decisiones contractuales requieren ratificación del equipo antes de fusionar el PR. No desplegado a Azure. |
-| Recomendaciones personalizadas reales e integración de identidad/APIM | Recomendaciones e identidad no integradas; validación de certificado implementada, pendiente de probar la frontera TLS de Azure. |
+| Recomendaciones personalizadas reales e integración de identidad/APIM | Flujo HTTP implementado y probado localmente; falta validar clientes y la frontera TLS/identidad real de Azure/APIM. |
 
 La web y Android continúan consumiendo `/skills-gap`. Documentar `/courses`
 no exige otra llamada para obtener sus recomendaciones ni sustituye el arreglo
@@ -125,8 +100,7 @@ un parámetro de orden configurable ni paginación por cursor en este borrador.
 Los filtros se combinan con AND. Se propone rechazar con HTTP 400 parámetros
 reconocidos repetidos, objetos, arreglos, vacíos o solo espacios; en paginación
 tampoco se aceptan signos, decimales, notación exponencial o números inseguros.
-Los parámetros desconocidos se ignoran, siguiendo el comportamiento existente
-de `/skills-gap`. También se rechaza NUL, no representable en `text` de PostgreSQL.
+Los parámetros desconocidos se ignoran en el catálogo; `/skills-gap` ahora los rechaza. También se rechaza NUL, no representable en `text` de PostgreSQL.
 Los errores implementados son 400 con `{ "error": "INVALID_QUERY", "message":
 "Parámetros de consulta inválidos." }` y 503 con `{ "error": "CATALOG_UNAVAILABLE",
 "message": "El catálogo no está disponible temporalmente." }`. Estos cuerpos
@@ -140,29 +114,10 @@ nivel de mercado, idioma, puntuación o precio: no tienen respaldo en este model
 
 ### Curso de catálogo y curso sugerido
 
-Se mantienen esquemas independientes, evitando extender `CourseSuggestion`
-mediante `allOf`: ese esquema no permite la duración desconocida del catálogo.
-Los tipos y esquemas existentes de `/skills-gap` no cambian. Los nuevos modelos
-de catálogo están separados en `src/models/courses.ts`.
-
-| Campo | `CourseSuggestion` existente | `CatalogCourse` propuesto |
-| --- | --- | --- |
-| `id` | Cadena, sin exigir formato decimal; los IDs demo actuales siguen válidos. | Cadena opaca para clientes; se propone `String(courses.id)`, pendiente de aprobación. |
-| `title`, `url`, `platform` | Obligatorios. | Obligatorios, mapeados a las columnas homónimas. |
-| `logoUrl` | Obligatorio, nullable. | Obligatorio, nullable; procede de `logo_url`. |
-| `durationHours` | Obligatorio, entero no nullable. | Obligatorio, entero nullable; procede de `duration_hours`. |
-| `isPaid` | No forma parte del esquema actual. | Booleano obligatorio, procede de `is_paid`. |
-| `skills` | No forma parte del esquema actual. | Arreglo obligatorio de nombres de habilidades, sin duplicados; admite `[]`. |
-
-Convertir un ID SQL a cadena no genera una identidad nueva ni ofrece secreto
-o autorización. Se propone que los clientes lo almacenen sin interpretarlo;
-no se cambia la PK ni se impone un formato nuevo sobre `/skills-gap`.
-
-En el catálogo, `null` conserva el significado de duración desconocida.
-No se debe inventar una duración, sustituirla por cero ni enviar null en
-`CourseSuggestion`: rompería el contrato que consumen web y Android.
-La integración futura de recomendaciones deberá esperar una política acordada
-para cursos sin duración, o una evolución explícita del contrato con clientes.
+CourseSuggestion y CatalogCourse conservan esquemas independientes. En 0.2.0 ambos
+permiten durationHours null, sin fabricar cero. Las sugerencias conservan IDs como
+cadenas opacas e incluyen isPaid/skills del catálogo. Este cambio explícito exige
+validación de clientes antes de activar; ver [compatibilidad](docs/skills-gap-http.md).
 
 ### Decisiones para consultar al equipo
 
@@ -649,8 +604,7 @@ es efímero. La autenticación GitHub-Azure no lee secretos de Key Vault.
 La seguridad del acceso y la verificación funcional a través de APIM quedan
 pendientes. El preflight falla cerrado si falta alguna condición; no hace un
 smoke test anónimo contra el backend ni transforma un despliegue en aprobación
-de sus endpoints de negocio. `/skills-gap` sigue bloqueado en producción mientras
-solo existan recomendaciones demo; `/courses` está implementado pero no se
+de sus endpoints de negocio. `/skills-gap` exige configuración, instantánea y contexto revisado; `/courses` está implementado pero no se
 despliega ni se conecta a Azure como parte de este PR.
 
 ### Alcance limitado del preflight Azure

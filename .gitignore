@@ -13,5 +13,7 @@ coverage/
 
 # Entradas de mercado revisadas localmente; no versionar datos operativos.
 /local-market-input/
+/local-catalog-input/
+/local-admin-import/
 
 .vscode/

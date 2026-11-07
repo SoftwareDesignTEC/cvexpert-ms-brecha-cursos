@@ -1,0 +1,28 @@
+{
+  "formatVersion": 1,
+  "batchId": "TEST-only-never-production",
+  "reviewedAt": "2026-11-01T00:00:00.000Z",
+  "skills": ["[TEST] Skill A", "[TEST] Skill B"],
+  "courses": [
+    {
+      "title": "[TEST] Course A",
+      "platform": "[TEST] Platform",
+      "url": "https://example.org/test/course-a",
+      "isPaid": false,
+      "durationHours": null,
+      "logoUrl": null,
+      "skills": ["[TEST] Skill A", "[TEST] Skill B"],
+      "sourceReference": "TEST:fixture-only-not-evidence"
+    },
+    {
+      "title": "[TEST] Course B",
+      "platform": "[TEST] Platform",
+      "url": "https://example.org/test/course-b",
+      "isPaid": true,
+      "durationHours": 0,
+      "logoUrl": "https://example.org/test/logo.png",
+      "skills": ["[TEST] Skill A"],
+      "sourceReference": "TEST:fixture-only-not-evidence"
+    }
+  ]
+}

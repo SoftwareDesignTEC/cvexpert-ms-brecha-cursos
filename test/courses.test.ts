@@ -87,7 +87,7 @@ test('pool is lazy; health and skills-gap survive configuration/connection error
     await withHttpApp(createApp('test', repository), async url => {
         assert.equal(attempts, 0);
         assert.equal((await fetch(`${url}/health`)).status, 200);
-        assert.equal((await fetch(`${url}/skills-gap`)).status, 200);
+        assert.equal((await fetch(`${url}/skills-gap`)).status, 401);
         assert.equal(attempts, 0);
         const response = await fetch(`${url}/courses`);
         assert.equal(response.status, 503);
@@ -98,7 +98,7 @@ test('pool is lazy; health and skills-gap survive configuration/connection error
     assert.equal(closed, 1);
     await withHttpApp(createApp('production', createPostgresCoursesRepository(() => { throw new Error(secretError); })), async url => {
         assert.equal((await fetch(`${url}/health`)).status, 200);
-        assert.equal((await fetch(`${url}/skills-gap`)).status, 503);
+        assert.equal((await fetch(`${url}/skills-gap`)).status, 401);
         assert.equal((await fetch(`${url}/courses`)).status, 503);
     });
 });

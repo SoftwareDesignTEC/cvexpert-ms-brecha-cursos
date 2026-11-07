@@ -10,9 +10,15 @@
     "db:check": "tsx src/db/cli.ts check",
     "db:test": "node --import tsx --test test/db/*.test.ts",
     "db:market:import": "tsx scripts/import-market.ts",
+    "db:catalog:import": "tsx scripts/import-catalog.ts",
+    "db:admin:preview": "tsx scripts/admin-import.ts",
     "dev": "tsx watch src/server.ts",
     "build": "tsc && tsc -p tsconfig.maintenance.json",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "db:admin:plan": "tsx scripts/admin-apply.ts plan",
+    "db:admin:sign": "tsx scripts/admin-apply.ts sign",
+    "db:admin:apply": "tsx scripts/admin-apply.ts apply",
+    "db:admin:verify": "tsx scripts/admin-apply.ts verify"
   },
   "repository": {
     "type": "git",

@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import type { LevelScale } from '../../src/domain/skills-gap.js';
 import { getDatabaseConfig } from '../../src/db/config.js';
 import { inTransaction } from '../../src/db/transaction.js';
@@ -24,7 +24,7 @@ export async function importMarketRequirements(pool: Pool, value: unknown, scale
     options: ImportOptions = {}, env: NodeJS.ProcessEnv = process.env): Promise<ImportReport> {
     assertLocalMaintenance(env);
     assertLocalMaintenance({ ...env, PGHOST: String(pool.options.host ?? ''), PGUSER: String(pool.options.user ?? '') });
-    const document = parseImportDocument(value, scale);
+    parseImportDocument(value, scale);
     return inTransaction(pool, async client => {
         // El dry-run es READ ONLY también en PostgreSQL: no ejecuta DML que luego revierta.
         if (!options.apply) await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
@@ -41,36 +41,7 @@ export async function importMarketRequirements(pool: Pool, value: unknown, scale
             await client.query('SELECT pg_advisory_xact_lock(834921, 1)');
             await client.query('LOCK TABLE public.market_requirements IN SHARE ROW EXCLUSIVE MODE');
         }
-        const skills = await client.query<{ id: number; name: string }>(
-            'SELECT id, name FROM public.skills WHERE name = ANY($1::text[])', [document.records.map(row => row.skillName)]);
-        const ids = new Map(skills.rows.map(row => [row.name, row.id]));
-        if (document.records.some(row => !ids.has(row.skillName))) throw new MarketImportError('El lote contiene habilidades inexistentes; no se crean automáticamente.');
-        const existing = await client.query<StoredRecord & { preciseDate: boolean }>(`SELECT
-            r.market_key AS "marketKey", s.name AS "skillName", r.scale_key AS "scaleKey",
-            r.required_level AS "requiredLevel", r.source_reference AS "sourceReference",
-            to_char(r.observed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "observedAt",
-            r.data_kind AS "dataKind", (date_trunc('milliseconds', r.observed_at) = r.observed_at
-                AND r.observed_at >= TIMESTAMPTZ '0001-01-01 00:00:00+00'
-                AND r.observed_at < TIMESTAMPTZ '10000-01-01 00:00:00+00') AS "preciseDate"
-            FROM public.market_requirements r JOIN public.skills s ON s.id = r.skill_id WHERE r.market_key = $1`, [document.marketKey]);
-        for (const row of existing.rows) {
-            if (row.scaleKey !== null && row.scaleKey !== scale.key) throw new MarketImportError('El contexto ya utiliza otra escala; no se convierte automáticamente.');
-            if (row.requiredLevel !== null && !scale.levels.includes(row.requiredLevel)) throw new MarketImportError('El contexto contiene niveles ajenos a la escala suministrada.');
-            if (row.dataKind !== document.records[0]!.dataKind) throw new MarketImportError('No se reclasifica un contexto existente entre demo y reference.');
-            if (!row.preciseDate) throw new MarketImportError('El contexto contiene fechas con precisión mayor a milisegundos; requiere revisión de mantenimiento.');
-        }
-        const byName = new Map(existing.rows.map(({ preciseDate: _, ...row }) => [row.skillName, row]));
-        const changes = document.records.map(after => {
-            const before = byName.get(after.skillName) ?? null;
-            const same = before && before.scaleKey === after.scaleKey && before.requiredLevel === after.requiredLevel
-                && before.sourceReference === after.sourceReference && before.observedAt === after.observedAt && before.dataKind === after.dataKind;
-            const action = !before ? 'insert' : same ? 'unchanged' : 'update';
-            if (action === 'update' && after.observedAt <= before!.observedAt) {
-                throw new MarketImportError('Una actualización exige una observación posterior; no se sobrescriben evidencias iguales o anteriores.');
-            }
-            return { action, before, after } as ImportChange;
-        });
-        const requiresAllowUpdates = changes.some(change => change.action === 'update');
+        const { document, ids, changes, requiresAllowUpdates } = await planMarketRequirements(client, value, scale);
         if (options.apply) {
             if (requiresAllowUpdates && !options.allowUpdates) throw new MarketImportError('Hay actualizaciones: revisa el dry-run y usa --allow-updates junto con --apply.');
             for (const change of changes) {
@@ -90,4 +61,43 @@ export async function importMarketRequirements(pool: Pool, value: unknown, scale
         }
         return { mode: options.apply ? 'applied' : 'dry-run', marketKey: document.marketKey, changes, requiresAllowUpdates };
     });
+}
+
+// Shared query-only planner. Never changes transaction mode or executes DML.
+export async function planMarketRequirements(client: PoolClient, value: unknown, scale: LevelScale, pendingSkills: readonly string[] = []) {
+    const document = parseImportDocument(value, scale);
+    const skills = await client.query<{ id: number; name: string }>(
+        'SELECT id, name FROM public.skills WHERE name = ANY($1::text[])', [document.records.map(row => row.skillName)]);
+    const ids = new Map(skills.rows.map(row => [row.name, row.id]));
+    // Solo el coordinador administrativo propone habilidades declaradas por catálogo.
+    // Los importadores locales no pasan pendingSkills y conservan su restricción.
+    if (document.records.some(row => !ids.has(row.skillName) && !pendingSkills.includes(row.skillName))) throw new MarketImportError('El lote contiene habilidades inexistentes; no se crean automáticamente.');
+    const existing = await client.query<StoredRecord & { preciseDate: boolean }>(`SELECT
+        r.market_key AS "marketKey", s.name AS "skillName", r.scale_key AS "scaleKey",
+        r.required_level AS "requiredLevel", r.source_reference AS "sourceReference",
+        to_char(r.observed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "observedAt",
+        r.data_kind AS "dataKind", (date_trunc('milliseconds', r.observed_at) = r.observed_at
+            AND r.observed_at >= TIMESTAMPTZ '0001-01-01 00:00:00+00'
+            AND r.observed_at < TIMESTAMPTZ '10000-01-01 00:00:00+00') AS "preciseDate"
+        FROM public.market_requirements r JOIN public.skills s ON s.id = r.skill_id WHERE r.market_key = $1`, [document.marketKey]);
+    for (const row of existing.rows) {
+        if (row.scaleKey !== null && row.scaleKey !== scale.key) throw new MarketImportError('El contexto ya utiliza otra escala; no se convierte automáticamente.');
+        if (row.requiredLevel !== null && !scale.levels.includes(row.requiredLevel)) throw new MarketImportError('El contexto contiene niveles ajenos a la escala suministrada.');
+        if (row.dataKind !== document.records[0]!.dataKind) throw new MarketImportError('No se reclasifica un contexto existente entre demo y reference.');
+        if (!row.preciseDate) throw new MarketImportError('El contexto contiene fechas con precisión mayor a milisegundos; requiere revisión de mantenimiento.');
+    }
+    const byName = new Map(existing.rows.map(({ preciseDate: _, ...row }) => [row.skillName, row]));
+    const changes = document.records.map(after => {
+        const before = byName.get(after.skillName) ?? null;
+        const same = before && before.scaleKey === after.scaleKey && before.requiredLevel === after.requiredLevel
+            && before.sourceReference === after.sourceReference && before.observedAt === after.observedAt && before.dataKind === after.dataKind;
+        const action = !before ? 'insert' : same ? 'unchanged' : 'update';
+        if (action === 'update' && after.observedAt <= before!.observedAt) {
+            throw new MarketImportError('Una actualización exige una observación posterior; no se sobrescriben evidencias iguales o anteriores.');
+        }
+        return { action, before, after } as ImportChange;
+    });
+    const requiresAllowUpdates = changes.some(change => change.action === 'update');
+
+    return { document, ids, changes, requiresAllowUpdates };
 }

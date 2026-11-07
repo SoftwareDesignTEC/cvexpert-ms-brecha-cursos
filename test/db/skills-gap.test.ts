@@ -15,7 +15,7 @@ const pgCode = (code: string) => (error: unknown) => !!error && typeof error ===
 
 test('motor con requisitos y catálogo reales en PostgreSQL 17 desechable', async t => withTestDatabase(async owner => {
     await t.test('migración versionada reproducible sin registros de mercado implícitos', async () => {
-        assert.deepEqual(await migrate(owner), ['001_create_catalog.sql', '002_create_market_requirements.sql']);
+        assert.deepEqual(await migrate(owner), ['001_create_catalog.sql', '002_create_market_requirements.sql', '003_create_user_skill_snapshots.sql', '004_create_admin_import_runs.sql']);
         assert.deepEqual(await migrate(owner), []);
         assert.equal((await owner.query('SELECT count(*)::int AS n FROM public.market_requirements')).rows[0].n, 0);
     });

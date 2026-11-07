@@ -142,12 +142,11 @@ test('GET /courses con PostgreSQL real y rol exclusivamente SELECT', async t => 
                 assert.equal((await getPage()).totalRecords, 4);
             });
 
-            await t.test('health y skills-gap conservan respuestas existentes', async () => {
+            await t.test('health conserva respuesta y skills-gap exige identidad', async () => {
                 assert.deepEqual(await (await fetch(`${url}/health`)).json(), { status: 'ok', service: 'brecha-cursos' });
                 const gaps = await fetch(`${url}/skills-gap`);
-                assert.equal(gaps.status, 200);
-                assert.equal(gaps.headers.get('x-data-mode'), 'demo');
-                assert.equal((await gaps.json() as { totalRecords: number }).totalRecords, 3);
+                assert.equal(gaps.status, 401);
+                assert.equal((await gaps.json() as { error: string }).error, 'USER_IDENTITY_REQUIRED');
             });
         });
     } finally {
@@ -170,6 +169,6 @@ test('conexión PostgreSQL rechazada devuelve 503 sin detalles y health sigue di
         assert.equal(response.status, 503);
         assert.deepEqual(await response.json(), { error: 'CATALOG_UNAVAILABLE', message: 'El catálogo no está disponible temporalmente.' });
         assert.equal((await fetch(`${url}/health`)).status, 200);
-        assert.equal((await fetch(`${url}/skills-gap`)).status, 503);
+        assert.equal((await fetch(`${url}/skills-gap`)).status, 401);
     });
 });
