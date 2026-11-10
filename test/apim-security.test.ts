@@ -28,7 +28,8 @@ test('certificado X.509 correcto conserva courses, exige identidad y protege doc
             assert.ok((await response.text()).length > 20, path);
         }
         const specification = await (await fetch(`${url}/openapi.json`, init)).json() as { paths: Record<string, unknown> };
-        assert.deepEqual(Object.keys(specification.paths).sort(), ['/courses', '/health', '/skills-gap', '/skills-gap/input']);
+        assert.deepEqual(Object.keys(specification.paths).sort(),
+            ['/courses', '/health', '/skills-gap', '/skills-gap/evaluate', '/skills-gap/input']);
     });
 });
 
