@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { parse } from 'yaml';
+import { evaluateJobSkillsGap } from '../src/services/job-skills-gap.service.js';
 
 test('contrato activo: referencias resolubles, seguridad y solo operaciones implementadas', () => {
     const specification = parse(readFileSync(new URL('../openapi.yaml', import.meta.url), 'utf8'));
@@ -17,7 +18,8 @@ test('contrato activo: referencias resolubles, seguridad y solo operaciones impl
         }
     };
     visit(specification);
-    assert.deepEqual(Object.keys(specification.paths).sort(), ['/courses', '/health', '/skills-gap', '/skills-gap/input']);
+    assert.deepEqual(Object.keys(specification.paths).sort(),
+        ['/courses', '/health', '/skills-gap', '/skills-gap/evaluate', '/skills-gap/input']);
     assert.deepEqual(specification.paths['/health'].get.security, []);
     assert.equal(specification.security, undefined);
     assert.equal(specification.components.securitySchemes, undefined);
@@ -41,4 +43,8 @@ test('contrato activo: referencias resolubles, seguridad y solo operaciones impl
             assert.ok(specification.paths[path].get.responses[status].content['application/json'].schema);
         }
     }
+    const evaluate = specification.paths['/skills-gap/evaluate'].post;
+    assert.deepEqual(Object.keys(evaluate.responses).sort(), ['200', '400', '401', '403', '413', '503']);
+    assert.deepEqual(evaluateJobSkillsGap(evaluate.requestBody.content['application/json'].example),
+        evaluate.responses['200'].content['application/json'].example);
 });

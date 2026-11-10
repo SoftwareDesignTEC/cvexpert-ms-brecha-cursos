@@ -4,7 +4,8 @@ info:
   version: 0.2.0
   description: >
     Contrato activo del backend. GET /courses consulta PostgreSQL y GET /skills-gap usa instantáneas
-    autenticadas y el motor ordinal.
+    autenticadas y el motor ordinal. POST /skills-gap/evaluate calcula la cobertura de habilidades
+    declaradas por oferta. Está implementado en el backend y pendiente de publicación en APIM e integración en clientes.
 
     APIM está configurado por separado y su operación de brecha todavía usa un mock.
 
@@ -339,6 +340,102 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SkillsGapError"
+  /skills-gap/evaluate:
+    post:
+      tags:
+        - Brecha de habilidades
+      operationId: evaluateJobSkillsGap
+      summary: Evaluar la cobertura de habilidades declaradas por oferta
+      x-implementation-status: implemented-pending-apim-and-client-integration
+      description: |
+        Compara un CV con 1 a 20 ofertas usando las proyecciones que suministra el cliente.
+        El backend calcula la cobertura sin persistir datos ni verificar las proyecciones o
+        su titularidad. El resultado es informativo y no sirve para autorización, contratación
+        ni certificación de competencias. No hay comparación ordinal porque las ofertas
+        carecen de niveles requeridos.
+
+        Requiere X-User-Id único inyectado por APIM bajo certificado verificado.
+        No admite parámetros de consulta, propiedades adicionales ni bypass local.
+        El cuerpo JSON admite hasta 100 KiB.
+
+        La comparación normaliza espacios, mayúsculas y acentos latinos agudos, graves,
+        circunflejos y diéresis. Conserva la ñ y la puntuación. Se deduplican las habilidades
+        normalizadas; niveles distintos para la misma habilidad del CV y IDs de oferta repetidos
+        producen 400. Los nombres de oferta vacíos o solo con espacios se omiten.
+        Los resultados siguen el orden de entrada de las ofertas y, en cada lista de
+        habilidades, la primera aparición del nombre en la oferta.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobSkillsGapInput"
+            example:
+              cv:
+                id: "123"
+                skills:
+                  - { name: Python, level: advanced }
+                  - { name: SQL, level: intermediate }
+              jobs:
+                - { id: "456", skills: [Python, SQL, Docker] }
+                - { id: "789", skills: [] }
+      responses:
+        "200":
+          description: Cobertura de las habilidades declaradas en el CV para cada oferta.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobSkillsGapEvaluation"
+              example:
+                cvId: "123"
+                dataSource: client_request
+                results:
+                  - jobId: "456"
+                    status: partial
+                    requiredSkillsCount: 3
+                    documentedMatchesCount: 2
+                    documentedCoveragePercent: 66.67
+                    matchedSkills:
+                      - { name: Python, cvLevel: advanced }
+                      - { name: SQL, cvLevel: intermediate }
+                    notDocumentedSkills: [Docker]
+                  - jobId: "789"
+                    status: insufficient_information
+                    requiredSkillsCount: 0
+                    documentedMatchesCount: 0
+                    documentedCoveragePercent: null
+                    matchedSkills: []
+                    notDocumentedSkills: []
+        "400":
+          description: JSON o proyección inválida, o parámetros de consulta no permitidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
+        "401":
+          description: Identidad APIM ausente, múltiple o inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
+        "403": *a1
+        "413":
+          description: Cuerpo JSON superior a 100 KiB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
+        "503":
+          description: Configuración de verificación del certificado APIM no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
 components:
   schemas:
     CoursesPage:
@@ -652,6 +749,120 @@ components:
           type: string
         message:
           type: string
+    JobSkillsGapId:
+      type: string
+      minLength: 1
+      maxLength: 200
+      description: Identificador opaco, conservado literalmente. Debe contener algún carácter distinto de espacio y no admite caracteres de control.
+    JobSkillsGapCvLevel:
+      type: string
+      enum: [beginner, intermediate, advanced, expert]
+      description: Nivel declarado en el CV.
+    JobSkillsGapInput:
+      type: object
+      additionalProperties: false
+      required: [cv, jobs]
+      properties:
+        cv:
+          type: object
+          additionalProperties: false
+          required: [id, skills]
+          properties:
+            id:
+              $ref: "#/components/schemas/JobSkillsGapId"
+            skills:
+              type: array
+              maxItems: 500
+              items:
+                type: object
+                additionalProperties: false
+                required: [name, level]
+                properties:
+                  name:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+                    description: Nombre de habilidad del CV. Debe contener texto tras normalizar espacios.
+                  level:
+                    $ref: "#/components/schemas/JobSkillsGapCvLevel"
+        jobs:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, skills]
+            properties:
+              id:
+                $ref: "#/components/schemas/JobSkillsGapId"
+              skills:
+                type: array
+                maxItems: 200
+                items:
+                  type: string
+                  maxLength: 200
+    JobSkillsGapEvaluation:
+      type: object
+      additionalProperties: false
+      required: [cvId, dataSource, results]
+      properties:
+        cvId:
+          $ref: "#/components/schemas/JobSkillsGapId"
+        dataSource:
+          type: string
+          enum: [client_request]
+          description: Datos suministrados por el cliente, sin verificación independiente.
+        results:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/JobSkillsGapResult"
+    JobSkillsGapResult:
+      type: object
+      additionalProperties: false
+      required: [jobId, status, requiredSkillsCount, documentedMatchesCount, documentedCoveragePercent, matchedSkills, notDocumentedSkills]
+      properties:
+        jobId:
+          $ref: "#/components/schemas/JobSkillsGapId"
+        status:
+          type: string
+          enum: [complete, partial, insufficient_information]
+          description: complete indica coincidencia con todos los nombres identificados; partial indica al menos un
+            nombre no documentado, incluso con cero coincidencias; insufficient_information indica ausencia de nombres.
+        requiredSkillsCount:
+          type: integer
+          minimum: 0
+          description: Cantidad de nombres únicos identificados en la oferta.
+        documentedMatchesCount:
+          type: integer
+          minimum: 0
+          description: Cantidad de esos nombres que también aparecen en el CV.
+        documentedCoveragePercent:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: Coincidencias divididas entre requisitos únicos por 100, redondeadas a dos decimales.
+            null indica que la oferta no contiene habilidades identificables.
+        matchedSkills:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, cvLevel]
+            properties:
+              name:
+                type: string
+                description: Primera grafía de la oferta, con espacios normalizados.
+              cvLevel:
+                $ref: "#/components/schemas/JobSkillsGapCvLevel"
+        notDocumentedSkills:
+          type: array
+          items:
+            type: string
+          description: Habilidades de la oferta ausentes en la proyección del CV.
 servers:
   - url: /
     description: Backend interno; confirmar las rutas y reescrituras de APIM antes de probar el gateway.
