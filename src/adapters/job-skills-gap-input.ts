@@ -1,5 +1,5 @@
 import { isCvSkillLevel, type CvSkillLevel } from '../domain/cv-skill-v1.js';
-import type { JobSkillRequirement } from '../domain/job-skills-gap.js';
+import { normalizeJobSkillName, type JobSkillRequirement } from '../domain/job-skills-gap.js';
 import { InvalidAnalysisInput } from '../domain/skills-gap.js';
 
 function fields(value: unknown, ...keys: string[]): Record<string, unknown> {
@@ -27,11 +27,9 @@ function id(value: unknown): string {
 }
 
 function skillName(value: unknown): JobSkillRequirement {
-    const name = text(value).trim().replace(/\s+/gu, ' ').normalize('NFC');
-    if (/\p{Cc}/u.test(name)) throw new InvalidAnalysisInput();
-    const key = name.toLowerCase().normalize('NFD')
-        .replace(/(\p{Script=Latin})[\u0300-\u0302\u0308]+/gu, '$1').normalize('NFC');
-    return { name, key };
+    const skill = normalizeJobSkillName(text(value));
+    if (/\p{Cc}/u.test(skill.name)) throw new InvalidAnalysisInput();
+    return skill;
 }
 
 export function adaptJobSkillsGapInput(body: unknown) {

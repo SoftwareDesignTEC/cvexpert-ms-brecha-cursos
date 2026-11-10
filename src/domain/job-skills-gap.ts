@@ -5,6 +5,13 @@ export interface JobSkillRequirement {
     name: string;
 }
 
+export function normalizeJobSkillName(value: string): JobSkillRequirement {
+    const name = value.trim().replace(/\s+/gu, ' ').normalize('NFC');
+    const key = name.toLowerCase().normalize('NFD')
+        .replace(/(\p{Script=Latin})[\u0300-\u0302\u0308]+/gu, '$1').normalize('NFC');
+    return { name, key };
+}
+
 export function compareJobSkills(
     documentedSkills: ReadonlyMap<string, CvSkillLevel>,
     requirements: readonly JobSkillRequirement[],

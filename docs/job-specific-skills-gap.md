@@ -76,6 +76,53 @@ El límite es de 1 a 20 ofertas, 500 habilidades en el CV y 200 por oferta, cont
 
 APIM deberá publicar el POST y dirigirlo a `/skills-gap/evaluate` en el backend. La política deberá autenticar al usuario, sobrescribir `X-User-Id` con la identidad autenticada y presentar el certificado cliente durante mTLS con App Service. El backend exige un certificado autorizado y un único encabezado válido de identidad. La ruta aplica `Cache-Control: no-store` y rechaza parámetros de consulta y campos adicionales, incluido `userId`. Los errores JSON usan `error` y `message`. Los estados son 400 para entrada inválida, 401 para identidad inválida, 403 para certificado rechazado, 413 para cuerpo excesivo y 503 si falta la configuración de seguridad.
 
-## Evolución hacia cursos
+## Recomendaciones por oferta
 
-El servicio de aplicación es el punto de extensión para cruzar `notDocumentedSkills` con `courses` y `course_skills` en una fase posterior, bajo reglas de pertinencia explícitas. Si Ofertas incorpora niveles de referencia, cada requisito normalizado ya tiene su propia estructura y podrá incluir el nivel requerido. La evaluación actual se realiza en memoria, con los datos de la solicitud y sin acceder a los repositorios de persistencia o al catálogo.
+`POST /skills-gap/recommendations` acepta el mismo JSON y los mismos límites que la evaluación. Conserva sus resultados por oferta y agrega una recomendación por cada habilidad de `notDocumentedSkills`. La pertinencia depende de la asociación explícita en `course_skills`. Un curso puede aparecer en varias habilidades u ofertas. Cada lista devuelve hasta cinco cursos distintos por ID numérico ascendente. El orden corresponde al ID del catálogo. `durationHours: null` conserva una duración desconocida.
+
+| Resultado | Significado |
+| --- | --- |
+| `catalogStatus: not_needed` | Ninguna oferta tiene habilidades no documentadas. El catálogo queda sin consultar y todas las recomendaciones están vacías. |
+| `catalogStatus: consulted`, `catalogMatch: matched` | El catálogo respondió y se identificó un nombre único. `courses: []` indica que ese nombre carece de cursos elegibles. |
+| `catalogStatus: consulted`, `catalogMatch: not_found` | El nombre no figura en el catálogo. La lista de cursos está vacía. |
+| `catalogStatus: consulted`, `catalogMatch: ambiguous` | Varios nombres del catálogo comparten la misma clave normalizada. La lista de cursos está vacía. |
+| `503 CATALOG_UNAVAILABLE` | Falló una consulta necesaria. El evaluador puro `POST /skills-gap/evaluate` sigue disponible. |
+
+Ejemplo de respuesta para una oferta que pide Python y Docker, con solo Python declarado en el CV. El curso es un fixture ficticio de la base desechable de pruebas.
+
+```json
+{
+  "cvId": "123",
+  "dataSource": "client_request",
+  "catalogStatus": "consulted",
+  "results": [{
+    "jobId": "456",
+    "status": "partial",
+    "requiredSkillsCount": 2,
+    "documentedMatchesCount": 1,
+    "documentedCoveragePercent": 50,
+    "matchedSkills": [{ "name": "Python", "cvLevel": "advanced" }],
+    "notDocumentedSkills": ["Docker"],
+    "recommendations": [{
+      "skillName": "Docker",
+      "catalogMatch": "matched",
+      "courses": [{
+        "id": "20",
+        "title": "Contenedores y consultas",
+        "platform": "Catálogo local",
+        "url": "https://fixture.catalog.local/20",
+        "logoUrl": null,
+        "durationHours": null,
+        "isPaid": false,
+        "skills": ["Docker", "SQL"]
+      }]
+    }]
+  }]
+}
+```
+
+PostgreSQL ejecuta hasta dos lecturas por solicitud en una transacción de solo lectura con aislamiento `REPEATABLE READ`. La primera lee únicamente ID y nombre de `skills` y usa el normalizador del evaluador para resolver las claves solicitadas y detectar colisiones. La segunda recibe los IDs inequívocos como un parámetro de tipo arreglo y aplica el límite por habilidad con el índice de `course_skills`. El coste de la primera lectura crece con el número de nombres del catálogo. La segunda acota los cursos recuperados y devuelve sus habilidades asociadas.
+
+La consulta excluye marcadores `[DEMO]` y `[TEST]` sin distinguir mayúsculas en los datos del curso y las habilidades asociadas. También excluye enlaces de los dominios reservados `example.com`, `example.net` y `example.org`, incluidos sus subdominios. El esquema del catálogo no conserva toda la evidencia editorial del importador, por lo que la respuesta expresa asociaciones registradas, sin verificación de procedencia, vigencia o calidad.
+
+La operación reutiliza la seguridad y los errores de entrada de la evaluación. Quedan pendientes publicar la nueva ruta en APIM e integrar Android y Web. Las recomendaciones son informativas y quedan fuera de decisiones de contratación y autorización.

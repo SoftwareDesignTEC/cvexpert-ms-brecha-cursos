@@ -19,7 +19,7 @@ test('contrato activo: referencias resolubles, seguridad y solo operaciones impl
     };
     visit(specification);
     assert.deepEqual(Object.keys(specification.paths).sort(),
-        ['/courses', '/health', '/skills-gap', '/skills-gap/evaluate', '/skills-gap/input']);
+        ['/courses', '/health', '/skills-gap', '/skills-gap/evaluate', '/skills-gap/input', '/skills-gap/recommendations']);
     assert.deepEqual(specification.paths['/health'].get.security, []);
     assert.equal(specification.security, undefined);
     assert.equal(specification.components.securitySchemes, undefined);
@@ -47,4 +47,9 @@ test('contrato activo: referencias resolubles, seguridad y solo operaciones impl
     assert.deepEqual(Object.keys(evaluate.responses).sort(), ['200', '400', '401', '403', '413', '503']);
     assert.deepEqual(evaluateJobSkillsGap(evaluate.requestBody.content['application/json'].example),
         evaluate.responses['200'].content['application/json'].example);
+    const recommendations = specification.paths['/skills-gap/recommendations'].post;
+    assert.deepEqual(recommendations.requestBody.content['application/json'].schema,
+        evaluate.requestBody.content['application/json'].schema);
+    assert.deepEqual(Object.keys(recommendations.responses).sort(), ['200', '400', '401', '403', '413', '503']);
+    assert.equal(specification.components.schemas.SkillCourseRecommendation.properties.courses.maxItems, 5);
 });

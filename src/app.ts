@@ -1,14 +1,18 @@
 import express, { type ErrorRequestHandler } from 'express';
 import { createApimCertificateGuard } from './security/apim-certificate.js';
+import { createJobSkillsGapController } from './controllers/job-skills-gap.controller.js';
 import { createDocumentationRouter } from './documentation.js';
 import { createSkillsGapRouter } from './routes/skills-gap.routes.js';
 import { createCoursesRouter } from './routes/courses.routes.js';
 import { createCoursesService } from './services/courses.service.js';
+import { createJobCourseRecommendationsService } from './services/job-course-recommendations.service.js';
+import { createPostgresJobCourseRecommendationsRepository, type JobCourseRecommendationsRepository } from './repositories/job-course-recommendations.repository.js';
 import { createPostgresCoursesRepository, type CoursesRepository } from './repositories/courses.repository.js';
 import { createPostgresSkillsGapRepository, createPostgresUserSkillsRepository, type SkillsGapRepository, type UserSkillsRepository } from './repositories/skills-gap.repository.js';
 
 export function createApp(environment = process.env.NODE_ENV, repository: CoursesRepository = createPostgresCoursesRepository(), securitySettings: NodeJS.ProcessEnv = process.env,
-    users: UserSkillsRepository = createPostgresUserSkillsRepository(), market: SkillsGapRepository = createPostgresSkillsGapRepository()) {
+    users: UserSkillsRepository = createPostgresUserSkillsRepository(), market: SkillsGapRepository = createPostgresSkillsGapRepository(),
+    recommendations: JobCourseRecommendationsRepository = createPostgresJobCourseRecommendationsRepository()) {
     const app = express();
     app.set('query parser', 'extended');
 
@@ -19,7 +23,8 @@ export function createApp(environment = process.env.NODE_ENV, repository: Course
     app.use(createApimCertificateGuard(environment, securitySettings));
     app.use(createDocumentationRouter());
 
-    app.use(createSkillsGapRouter(users, market, securitySettings.SKILLS_GAP_MARKET_KEY));
+    app.use(createSkillsGapRouter(users, market, securitySettings.SKILLS_GAP_MARKET_KEY,
+        createJobSkillsGapController(createJobCourseRecommendationsService(recommendations))));
     app.use(createCoursesRouter(createCoursesService(repository)));
     const jsonErrors: ErrorRequestHandler = (error, _req, res, next) => {
         if (error?.type === 'entity.parse.failed' || error?.type === 'entity.too.large') {
@@ -32,6 +37,6 @@ export function createApp(environment = process.env.NODE_ENV, repository: Course
     };
     app.use(jsonErrors);
     return Object.assign(app, {
-        async closeResources() { await Promise.all([repository.close?.(), users.close(), market.close()]); },
+        async closeResources() { await Promise.all([repository.close?.(), users.close(), market.close(), recommendations.close?.()]); },
     });
 }
