@@ -1,0 +1,4 @@
+{
+  "enabled": false,
+  "queries": [{ "skill": "Python", "products": ["test-product-python"], "subjects": [] }]
+}

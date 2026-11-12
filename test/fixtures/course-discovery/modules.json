@@ -1,0 +1,17 @@
+{
+  "value": [
+    {
+      "type": "module",
+      "id": "test.fixture.python",
+      "title": "[TEST] Módulo ficticio para probar el descubridor",
+      "url": "https://learn.microsoft.com/training/modules/test-fixture-python/",
+      "locale": "en-us",
+      "durationInMinutes": 45,
+      "summary": "[TEST] Metadatos sintéticos; no se verificó un curso real ni su temario.",
+      "levels": [{ "id": "beginner", "name": "Beginner" }],
+      "products": [{ "id": "test-product-python", "name": "Producto ficticio de pruebas" }],
+      "subjects": []
+    }
+  ],
+  "nextLink": null
+}

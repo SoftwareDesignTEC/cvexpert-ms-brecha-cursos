@@ -5,6 +5,11 @@ Importación administrativa **solo local**, con dry-run predeterminado y revisi�
 de conflictos: [catálogo de cursos y habilidades](docs/catalog-import.md).
 No es una funcionalidad HTTP desplegada ni habilita cargas a Azure.
 
+Descubrimiento formativo separado del catálogo: [proveedor Microsoft Learn v1,
+propuestas locales y revisión](docs/course-discovery.md). Ejecutar sin credenciales
+`npm run courses:discover -- --dry-run --fixture`. No consulta PostgreSQL ni publica
+cursos; el modo real y la programación permanecen desactivados por defecto.
+
 ## Ejecución local
 
 Requiere Node.js 24 y npm. Instalar dependencias con `npm ci`, copiar

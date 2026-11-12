@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "node --import tsx --test test/*.test.ts",
+    "courses:discover": "tsx scripts/discover-courses.ts",
     "db:migrate": "tsx src/db/cli.ts migrate",
     "db:seed": "tsx src/db/cli.ts seed",
     "db:check": "tsx src/db/cli.ts check",
