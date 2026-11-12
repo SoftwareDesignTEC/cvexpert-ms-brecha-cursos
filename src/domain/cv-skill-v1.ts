@@ -4,6 +4,8 @@ export const cvSkillScale = { key: 'cv-skill-v1', levels: [1, 2, 3, 4] } as cons
 const levels = { beginner: 1, intermediate: 2, advanced: 3, expert: 4 } as const;
 export type CvSkillLevel = keyof typeof levels;
 
+export function cvSkillOrdinal(level: CvSkillLevel): number { return levels[level]; }
+
 export function isCvSkillLevel(value: unknown): value is CvSkillLevel {
     return typeof value === 'string' && Object.hasOwn(levels, value);
 }

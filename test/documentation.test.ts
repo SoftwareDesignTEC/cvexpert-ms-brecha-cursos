@@ -49,7 +49,32 @@ test('contrato activo: referencias resolubles, seguridad y solo operaciones impl
         evaluate.responses['200'].content['application/json'].example);
     const recommendations = specification.paths['/skills-gap/recommendations'].post;
     assert.deepEqual(recommendations.requestBody.content['application/json'].schema,
-        evaluate.requestBody.content['application/json'].schema);
+        { $ref: '#/components/schemas/JobSkillsGapInput' });
+    assert.deepEqual(evaluate.requestBody.content['application/json'].schema,
+        { $ref: '#/components/schemas/JobSkillsGapEvaluationInput' });
     assert.deepEqual(Object.keys(recommendations.responses).sort(), ['200', '400', '401', '403', '413', '503']);
     assert.equal(specification.components.schemas.SkillCourseRecommendation.properties.courses.maxItems, 5);
+});
+
+test('ejemplo de niveles ejecutable, límites aditivos y contrato anterior de recomendaciones', () => {
+    const specification = parse(readFileSync(new URL('../openapi.yaml', import.meta.url), 'utf8'));
+    const fixture = JSON.parse(readFileSync(new URL('./fixtures/job-required-skill-levels.json', import.meta.url), 'utf8'));
+    assert.deepEqual(evaluateJobSkillsGap(fixture.request), fixture.response);
+    const operation = specification.paths['/skills-gap/evaluate'].post;
+    assert.deepEqual(operation.requestBody.content['application/json'].example, fixture.request);
+    assert.deepEqual(operation.responses['200'].content['application/json'].example, fixture.response);
+    const schemas = specification.components.schemas;
+    const original = schemas.JobSkillsGapInput.properties.jobs.items;
+    const extended = schemas.JobSkillsGapEvaluationInput.properties.jobs.items;
+    assert.equal(extended.additionalProperties, false);
+    assert.deepEqual(extended.required, original.required);
+    assert.deepEqual(extended.properties.skills, original.properties.skills);
+    assert.equal(extended.properties.description.maxLength, 20000);
+    assert.equal(extended.properties.requirements.maxItems, 100);
+    assert.equal(extended.properties.requirements.items.maxLength, 2000);
+    assert.equal(original.properties.description, undefined);
+    assert.equal(original.properties.requirements, undefined);
+    const documentation = readFileSync(new URL('../docs/job-required-skill-levels.md', import.meta.url), 'utf8');
+    assert.ok(documentation.includes(JSON.stringify(fixture.request, null, 2)));
+    assert.ok(documentation.includes(JSON.stringify(fixture.response, null, 2)));
 });
