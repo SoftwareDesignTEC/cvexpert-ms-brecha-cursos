@@ -1,0 +1,101 @@
+{
+  "request": {
+    "cv": {
+      "id": "cv:test",
+      "skills": [
+        {
+          "name": "Python",
+          "level": "intermediate"
+        },
+        {
+          "name": "SQL",
+          "level": "advanced"
+        }
+      ]
+    },
+    "jobs": [
+      {
+        "id": "job:test",
+        "skills": [
+          "Python",
+          "SQL",
+          "Docker"
+        ],
+        "description": "Python avanzado y SQL básico.",
+        "requirements": [
+          "Docker intermediate"
+        ]
+      }
+    ]
+  },
+  "response": {
+    "cvId": "cv:test",
+    "dataSource": "client_request",
+    "results": [
+      {
+        "jobId": "job:test",
+        "status": "partial",
+        "requiredSkillsCount": 3,
+        "documentedMatchesCount": 2,
+        "documentedCoveragePercent": 66.67,
+        "matchedSkills": [
+          {
+            "name": "Python",
+            "cvLevel": "intermediate"
+          },
+          {
+            "name": "SQL",
+            "cvLevel": "advanced"
+          }
+        ],
+        "notDocumentedSkills": [
+          "Docker"
+        ],
+        "skillLevelAssessments": [
+          {
+            "name": "Python",
+            "cvLevel": "intermediate",
+            "requiredLevel": "advanced",
+            "evidenceSource": "description",
+            "evidenceText": "Python avanzado",
+            "detectionStatus": "explicit",
+            "reason": null,
+            "status": "documented_skill_below_required",
+            "deficitSteps": 1
+          },
+          {
+            "name": "SQL",
+            "cvLevel": "advanced",
+            "requiredLevel": "beginner",
+            "evidenceSource": "description",
+            "evidenceText": "SQL básico",
+            "detectionStatus": "explicit",
+            "reason": null,
+            "status": "documented_skill_meets_required",
+            "deficitSteps": 0
+          },
+          {
+            "name": "Docker",
+            "cvLevel": null,
+            "requiredLevel": "intermediate",
+            "evidenceSource": "requirements",
+            "evidenceText": "Docker intermediate",
+            "detectionStatus": "explicit",
+            "reason": null,
+            "status": "not_documented",
+            "deficitSteps": null
+          }
+        ],
+        "levelAnalysis": {
+          "scale": "cv-skill-v1",
+          "comparedSkillsCount": 2,
+          "belowRequiredCount": 1,
+          "meetsRequiredCount": 1,
+          "notDocumentedCount": 1,
+          "unknownRequiredLevelCount": 0,
+          "conflictCount": 0
+        }
+      }
+    ]
+  }
+}

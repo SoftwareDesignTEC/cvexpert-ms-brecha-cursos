@@ -32,7 +32,15 @@ function skillName(value: unknown): JobSkillRequirement {
     return skill;
 }
 
-export function adaptJobSkillsGapInput(body: unknown) {
+function offerText(value: unknown, max: number): string {
+    if (typeof value !== 'string' || [...value].length > max
+        || /[\p{Cs}\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/u.test(value)) {
+        throw new InvalidAnalysisInput();
+    }
+    return value;
+}
+
+export function adaptJobSkillsGapInput(body: unknown, allowText = true) {
     const { cv, jobs } = fields(body, 'cv', 'jobs');
     const cvFields = fields(cv, 'id', 'skills');
     const cvId = id(cvFields.id);
@@ -48,7 +56,15 @@ export function adaptJobSkillsGapInput(body: unknown) {
 
     const jobIds = new Set<string>();
     const offers = items(jobs, 20, 1).map(job => {
-        const { id: rawId, skills } = fields(job, 'id', 'skills');
+        const optional = allowText && job && typeof job === 'object'
+            ? ['description', 'requirements'].filter(key => Object.hasOwn(job, key)) : [];
+        const jobFields = fields(job, 'id', 'skills', ...optional);
+        const { id: rawId, skills } = jobFields;
+        const text = optional.length === 0 ? undefined : {
+            description: Object.hasOwn(jobFields, 'description') ? offerText(jobFields.description, 20000) : undefined,
+            requirements: Object.hasOwn(jobFields, 'requirements')
+                ? items(jobFields.requirements, 100).map(value => offerText(value, 2000)) : undefined,
+        };
         const jobId = id(rawId);
         if (jobIds.has(jobId)) throw new InvalidAnalysisInput();
         jobIds.add(jobId);
@@ -57,7 +73,7 @@ export function adaptJobSkillsGapInput(body: unknown) {
             const skill = skillName(value);
             if (skill.key && !requirements.has(skill.key)) requirements.set(skill.key, skill);
         }
-        return { jobId, requirements: [...requirements.values()] };
+        return { jobId, requirements: [...requirements.values()], text };
     });
     return { cvId, documentedSkills, offers };
 }

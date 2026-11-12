@@ -6,7 +6,8 @@ export class RecommendationCatalogUnavailable extends Error {}
 
 export function createJobCourseRecommendationsService(repository: JobCourseRecommendationsRepository) {
     return async (body: unknown) => {
-        const evaluation = evaluateJobSkillsGap(body);
+        // Retain the original closed input contract until level-based recommendations are integrated.
+        const evaluation = evaluateJobSkillsGap(body, false);
         const missingByOffer = evaluation.results.map(result => result.notDocumentedSkills.map(normalizeJobSkillName));
         const keys = new Set(missingByOffer.flatMap(skills => skills.map(skill => skill.key)));
         let matches: ReadonlyMap<string, CatalogSkillMatch> = new Map();
