@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { CatalogDocument } from '../catalog-import/document.js';
-import { consolidateCandidates, DiscoveryError, type CourseCandidate, type CourseDiscoveryProvider, type DiscoveryConfig } from './model.js';
+import { consolidateCandidates, DiscoveryError, type CourseCandidate, type CourseTopic, type CourseDiscoveryProvider, type DiscoveryConfig } from './model.js';
 import type { DiscoveryStore } from './store.js';
 
-export async function discoverCourses(provider: CourseDiscoveryProvider, config: DiscoveryConfig,
+export async function discoverCourses<Query extends CourseTopic>(provider: CourseDiscoveryProvider<Query>, config: DiscoveryConfig<Query>,
     store: DiscoveryStore, options: { mode: 'fixture' | 'live'; scheduled?: boolean; catalog?: CatalogDocument },
     now: () => number = Date.now, delay: (ms: number) => Promise<unknown> = sleep) {
     const state = await store.load();

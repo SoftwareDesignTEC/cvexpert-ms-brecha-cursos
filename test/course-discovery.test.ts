@@ -203,6 +203,24 @@ test('programación desactivada por defecto; tick habilitado respeta intervalo s
     assert.equal(calls, 1);
 });
 
+test('otro proveedor puede definir su consulta sin taxonomía de Learn ni cambios al coordinador', async () => {
+    type Query = { skill: string; domains: string[] };
+    const source: CourseDiscoveryProvider<Query> = {
+        name: 'test-other-provider',
+        async search(query, permit) {
+            assert.deepEqual(query, { skill: 'Git', domains: ['test.example.org'] });
+            assert.equal('products' in query, false);
+            await permit();
+            return { candidates: [], rejected: 0, truncated: false };
+        },
+    };
+    const customConfig = { ...config(), queries: [{ skill: 'Git', domains: ['test.example.org'] }] };
+    const result = await discoverCourses(source, customConfig, memoryStore(), { mode: 'fixture' }, now);
+    assert.equal(result.status, 'completed');
+    assert.equal(result.requests, 1);
+    assert.equal(result.queries[0]!.skill, 'Git');
+});
+
 test('catálogo anterior intacto: snapshot se valida y URL existente se marca para revisión, sin conversión automática a v1', async () => {
     const candidate = (await search()).candidates[0]!;
     const catalog = parseCatalogDocument({ formatVersion: 1, batchId: 'test-catalog', reviewedAt: new Date(now()).toISOString(), skills: ['Python'],

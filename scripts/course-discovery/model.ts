@@ -4,11 +4,12 @@ import { parseCatalogDocument, type CatalogDocument } from '../catalog-import/do
 export class DiscoveryError extends Error {
     constructor(public readonly code: string, public readonly retryAfterMs = 0) { super(code); }
 }
-export interface DiscoveryQuery { skill: string; products: string[]; subjects: string[] }
-export interface DiscoveryConfig {
+export interface CourseTopic { skill: string }
+export interface DiscoveryQuery extends CourseTopic { products: string[]; subjects: string[] }
+export interface DiscoveryConfig<Query extends CourseTopic = DiscoveryQuery> {
     enabled: boolean; locale: string; intervalHours: number; cacheHours: number;
     timeoutMs: number; maxRequestsPerRun: number; maxRequestsPerDay: number;
-    minRequestIntervalMs: number; maxPages: number; pageSize: number; queries: DiscoveryQuery[];
+    minRequestIntervalMs: number; maxPages: number; pageSize: number; queries: Query[];
 }
 export interface CourseCandidate {
     source: string; externalId: string | null; title: string; platform: string;
@@ -20,9 +21,9 @@ export interface CourseCandidate {
         queriedAt: string; durationMinutes: number | null; language: string | null; levels: string[] }[];
 }
 export interface DiscoveryPageResult { candidates: CourseCandidate[]; rejected: number; truncated: boolean }
-export interface CourseDiscoveryProvider {
+export interface CourseDiscoveryProvider<Query extends CourseTopic = DiscoveryQuery> {
     readonly name: string;
-    search(query: DiscoveryQuery, beforeRequest: () => Promise<void>): Promise<DiscoveryPageResult>;
+    search(query: Query, beforeRequest: () => Promise<void>): Promise<DiscoveryPageResult>;
 }
 
 export function text(value: unknown, max = 4096): string {
