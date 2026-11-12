@@ -1,7 +1,14 @@
 import { InvalidAnalysisInput, requireText, type UserSkill } from './skills-gap.js';
 
 export const cvSkillScale = { key: 'cv-skill-v1', levels: [1, 2, 3, 4] } as const;
-const levels = new Map([['beginner', 1], ['intermediate', 2], ['advanced', 3], ['expert', 4]]);
+const levels = { beginner: 1, intermediate: 2, advanced: 3, expert: 4 } as const;
+export type CvSkillLevel = keyof typeof levels;
+
+export function cvSkillOrdinal(level: CvSkillLevel): number { return levels[level]; }
+
+export function isCvSkillLevel(value: unknown): value is CvSkillLevel {
+    return typeof value === 'string' && Object.hasOwn(levels, value);
+}
 
 // Entrada estricta: null expresa desconocimiento; un texto desconocido es un error,
 // nunca una evaluación cero ni una conversión porcentual.
@@ -17,7 +24,7 @@ export function adaptCvSkillInput(body: unknown): UserSkill[] {
         requireText(item.skillName);
         if (item.skillName.length > 200 || seen.has(item.skillName)) throw new InvalidAnalysisInput();
         seen.add(item.skillName);
-        const level = item.level === null ? null : typeof item.level === 'string' ? levels.get(item.level) : undefined;
+        const level = item.level === null ? null : isCvSkillLevel(item.level) ? levels[item.level] : undefined;
         if (level === undefined) throw new InvalidAnalysisInput();
         return { skillName: item.skillName, level, scaleKey: cvSkillScale.key };
     });

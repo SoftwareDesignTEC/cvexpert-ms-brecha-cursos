@@ -4,7 +4,8 @@ info:
   version: 0.2.0
   description: >
     Contrato activo del backend. GET /courses consulta PostgreSQL y GET /skills-gap usa instantáneas
-    autenticadas y el motor ordinal.
+    autenticadas y el motor ordinal. POST /skills-gap/evaluate calcula la cobertura de habilidades
+    declaradas por oferta. Está implementado en el backend y pendiente de publicación en APIM e integración en clientes.
 
     APIM está configurado por separado y su operación de brecha todavía usa un mock.
 
@@ -339,6 +340,211 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SkillsGapError"
+  /skills-gap/evaluate:
+    post:
+      tags:
+        - Brecha de habilidades
+      operationId: evaluateJobSkillsGap
+      summary: Evaluar la cobertura de habilidades declaradas por oferta
+      x-implementation-status: implemented-pending-apim-and-client-integration
+      description: |
+        Compara un CV con 1 a 20 ofertas usando las proyecciones que suministra el cliente.
+        El backend calcula la cobertura sin persistir datos ni verificar las proyecciones o
+        su titularidad. El resultado es informativo y no sirve para autorización, contratación
+        ni certificación de competencias. Si una oferta incluye description o requirements,
+        agrega análisis ordinal de niveles explícitos por habilidad (cv-skill-v1).
+        La cobertura documental no mide dominio ni cumplimiento de nivel.
+        Sin texto se conserva la respuesta anterior. Texto negado, contradictorio o
+        ambiguo no produce un nivel obligatorio; no se infiere de años ni seniority.
+
+        Requiere X-User-Id único inyectado por APIM bajo certificado verificado.
+        No admite parámetros de consulta, propiedades adicionales ni bypass local.
+        El cuerpo JSON admite hasta 100 KiB.
+
+        La comparación normaliza espacios, mayúsculas y acentos latinos agudos, graves,
+        circunflejos y diéresis. Conserva la ñ y la puntuación. Se deduplican las habilidades
+        normalizadas; niveles distintos para la misma habilidad del CV y IDs de oferta repetidos
+        producen 400. Los nombres de oferta vacíos o solo con espacios se omiten.
+        Los resultados siguen el orden de entrada de las ofertas y, en cada lista de
+        habilidades, la primera aparición del nombre en la oferta.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobSkillsGapEvaluationInput"
+            example:
+              cv:
+                id: cv:test
+                skills:
+                  - name: Python
+                    level: intermediate
+                  - name: SQL
+                    level: advanced
+              jobs:
+                - id: job:test
+                  skills:
+                    - Python
+                    - SQL
+                    - Docker
+                  description: Python avanzado y SQL básico.
+                  requirements:
+                    - Docker intermediate
+      responses:
+        "200":
+          description: Cobertura de las habilidades declaradas en el CV para cada oferta.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobSkillsGapEvaluation"
+              example:
+                cvId: cv:test
+                dataSource: client_request
+                results:
+                  - jobId: job:test
+                    status: partial
+                    requiredSkillsCount: 3
+                    documentedMatchesCount: 2
+                    documentedCoveragePercent: 66.67
+                    matchedSkills:
+                      - name: Python
+                        cvLevel: intermediate
+                      - name: SQL
+                        cvLevel: advanced
+                    notDocumentedSkills:
+                      - Docker
+                    skillLevelAssessments:
+                      - name: Python
+                        cvLevel: intermediate
+                        requiredLevel: advanced
+                        evidenceSource: description
+                        evidenceText: Python avanzado
+                        detectionStatus: explicit
+                        reason: null
+                        status: documented_skill_below_required
+                        deficitSteps: 1
+                      - name: SQL
+                        cvLevel: advanced
+                        requiredLevel: beginner
+                        evidenceSource: description
+                        evidenceText: SQL básico
+                        detectionStatus: explicit
+                        reason: null
+                        status: documented_skill_meets_required
+                        deficitSteps: 0
+                      - name: Docker
+                        cvLevel: null
+                        requiredLevel: intermediate
+                        evidenceSource: requirements
+                        evidenceText: Docker intermediate
+                        detectionStatus: explicit
+                        reason: null
+                        status: not_documented
+                        deficitSteps: null
+                    levelAnalysis:
+                      scale: cv-skill-v1
+                      comparedSkillsCount: 2
+                      belowRequiredCount: 1
+                      meetsRequiredCount: 1
+                      notDocumentedCount: 1
+                      unknownRequiredLevelCount: 0
+                      conflictCount: 0
+        "400":
+          description: JSON o proyección inválida, o parámetros de consulta no permitidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
+        "401":
+          description: Identidad APIM ausente, múltiple o inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
+        "403": *a1
+        "413":
+          description: Cuerpo JSON superior a 100 KiB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
+        "503":
+          description: Configuración de verificación del certificado APIM no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
+  /skills-gap/recommendations:
+    post:
+      tags:
+        - Brecha de habilidades
+      operationId: recommendCoursesByJobSkillsGap
+      summary: Consultar cursos asociados a habilidades no documentadas por oferta
+      x-implementation-status: implemented-pending-apim-and-client-integration
+      description: |
+        Recibe la misma proyección y aplica la misma comparación que POST /skills-gap/evaluate.
+        Cuando hay habilidades no documentadas, consulta el catálogo PostgreSQL propio mediante
+        asociaciones explícitas y devuelve hasta cinco cursos por habilidad, ordenados por ID numérico.
+        El orden no expresa calidad. Cada curso puede aparecer para varias habilidades u ofertas.
+        Si el nombre normalizado corresponde a varias habilidades del catálogo, se informa la ambigüedad
+        y se omiten sus cursos. Se excluyen registros marcados como ficticios y enlaces de ejemplo.
+
+        El resultado se basa en proyecciones aportadas por el cliente. La asociación indica pertinencia
+        en el catálogo. La procedencia editorial, vigencia y calidad de cada curso quedan sin verificar.
+        El resultado es informativo y queda fuera de decisiones de autorización y contratación.
+        POST /skills-gap/evaluate sigue disponible de forma independiente del catálogo.
+
+        Requiere un certificado APIM autorizado y un X-User-Id único inyectado por APIM.
+        Admite JSON de hasta 100 KiB y rechaza parámetros de consulta y propiedades adicionales.
+        Todas las respuestas aplican Cache-Control con el valor no-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobSkillsGapInput"
+      responses:
+        "200":
+          description: Evaluaciones y recomendaciones por oferta. Si la consulta tiene éxito, courses vacío indica que no se devolvieron cursos elegibles.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobCourseRecommendations"
+        "400":
+          description: JSON o proyección inválida, o parámetros de consulta no permitidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
+        "401":
+          description: Identidad APIM ausente, múltiple o inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
+        "403": *a1
+        "413":
+          description: Cuerpo JSON superior a 100 KiB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillsGapError"
+        "503":
+          description: "CATALOG_UNAVAILABLE cuando la consulta necesaria falla. APIM_SECURITY_UNAVAILABLE cuando falta configuración de seguridad."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnavailableError"
 components:
   schemas:
     CoursesPage:
@@ -652,6 +858,312 @@ components:
           type: string
         message:
           type: string
+    JobSkillsGapId:
+      type: string
+      minLength: 1
+      maxLength: 200
+      description: Identificador opaco, conservado literalmente. Debe contener algún carácter distinto de espacio y no admite caracteres de control.
+    JobSkillsGapCvLevel:
+      type: string
+      enum: [beginner, intermediate, advanced, expert]
+      description: Nivel declarado en el CV.
+    JobSkillsGapInput:
+      type: object
+      additionalProperties: false
+      required: [cv, jobs]
+      properties:
+        cv:
+          type: object
+          additionalProperties: false
+          required: [id, skills]
+          properties:
+            id:
+              $ref: "#/components/schemas/JobSkillsGapId"
+            skills:
+              type: array
+              maxItems: 500
+              items:
+                type: object
+                additionalProperties: false
+                required: [name, level]
+                properties:
+                  name:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+                    description: Nombre de habilidad del CV. Debe contener texto tras normalizar espacios.
+                  level:
+                    $ref: "#/components/schemas/JobSkillsGapCvLevel"
+        jobs:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, skills]
+            properties:
+              id:
+                $ref: "#/components/schemas/JobSkillsGapId"
+              skills:
+                type: array
+                maxItems: 200
+                items:
+                  type: string
+                  maxLength: 200
+    JobSkillsGapEvaluationInput:
+      type: object
+      additionalProperties: false
+      required: [cv, jobs]
+      properties:
+        cv:
+          type: object
+          additionalProperties: false
+          required: [id, skills]
+          properties:
+            id:
+              $ref: "#/components/schemas/JobSkillsGapId"
+            skills:
+              type: array
+              maxItems: 500
+              items:
+                type: object
+                additionalProperties: false
+                required: [name, level]
+                properties:
+                  name:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+                    description: Nombre de habilidad del CV. Debe contener texto tras normalizar espacios.
+                  level:
+                    $ref: "#/components/schemas/JobSkillsGapCvLevel"
+        jobs:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, skills]
+            properties:
+              id:
+                $ref: "#/components/schemas/JobSkillsGapId"
+              skills:
+                type: array
+                maxItems: 200
+                items:
+                  type: string
+                  maxLength: 200
+              description:
+                type: string
+                maxLength: 20000
+                description: Texto no confiable. Admite tabulaciones y saltos de línea; rechaza controles restantes y sustitutos Unicode aislados.
+              requirements:
+                type: array
+                maxItems: 100
+                items:
+                  type: string
+                  maxLength: 2000
+                  description: Requisito textual con las mismas restricciones Unicode que description.
+    JobSkillsGapEvaluation:
+      type: object
+      additionalProperties: false
+      required: [cvId, dataSource, results]
+      properties:
+        cvId:
+          $ref: "#/components/schemas/JobSkillsGapId"
+        dataSource:
+          type: string
+          enum: [client_request]
+          description: Datos suministrados por el cliente, sin verificación independiente.
+        results:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/JobSkillsGapResult"
+    JobSkillsGapResult:
+      type: object
+      additionalProperties: false
+      required: [jobId, status, requiredSkillsCount, documentedMatchesCount, documentedCoveragePercent, matchedSkills, notDocumentedSkills]
+      properties:
+        jobId:
+          $ref: "#/components/schemas/JobSkillsGapId"
+        status:
+          type: string
+          enum: [complete, partial, insufficient_information]
+          description: complete indica coincidencia con todos los nombres identificados; partial indica al menos un
+            nombre no documentado, incluso con cero coincidencias; insufficient_information indica ausencia de nombres.
+        requiredSkillsCount:
+          type: integer
+          minimum: 0
+          description: Cantidad de nombres únicos identificados en la oferta.
+        documentedMatchesCount:
+          type: integer
+          minimum: 0
+          description: Cantidad de esos nombres que también aparecen en el CV.
+        documentedCoveragePercent:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: Coincidencias divididas entre requisitos únicos por 100, redondeadas a dos decimales.
+            null indica que la oferta no contiene habilidades identificables.
+        matchedSkills:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, cvLevel]
+            properties:
+              name:
+                type: string
+                description: Primera grafía de la oferta, con espacios normalizados.
+              cvLevel:
+                $ref: "#/components/schemas/JobSkillsGapCvLevel"
+        notDocumentedSkills:
+          type: array
+          items:
+            type: string
+          description: Habilidades de la oferta ausentes en la proyección del CV.
+        skillLevelAssessments:
+          type: array
+          maxItems: 200
+          description: Presente solo si esta oferta incluye description o requirements, incluso vacíos.
+          items:
+            $ref: "#/components/schemas/JobSkillLevelAssessment"
+        levelAnalysis:
+          $ref: "#/components/schemas/JobLevelAnalysis"
+    JobSkillLevelAssessment:
+      type: object
+      additionalProperties: false
+      required: [name, cvLevel, requiredLevel, evidenceSource, evidenceText, detectionStatus, reason, status, deficitSteps]
+      properties:
+        name:
+          type: string
+        cvLevel:
+          type: string
+          nullable: true
+          enum: [beginner, intermediate, advanced, expert, null]
+          description: null significa que la habilidad no está documentada, nunca nivel cero.
+        requiredLevel:
+          type: string
+          nullable: true
+          enum: [beginner, intermediate, advanced, expert, null]
+        evidenceSource:
+          type: string
+          nullable: true
+          enum: [description, requirements, null]
+        evidenceText:
+          type: string
+          nullable: true
+          maxLength: 300
+          description: Fragmento literal del texto de entrada; null salvo detección explícita.
+        detectionStatus:
+          type: string
+          enum: [explicit, unknown, conflict]
+        reason:
+          type: string
+          nullable: true
+          enum: [no_explicit_evidence, optional, negated, contradictory, ambiguous, null]
+        status:
+          type: string
+          enum: [documented_skill_below_required, documented_skill_meets_required, not_documented, unknown_required_level]
+        deficitSteps:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 3
+          description: max(0, ordinal requerido menos ordinal CV); null sin comparación válida. Nunca porcentaje.
+    JobLevelAnalysis:
+      type: object
+      additionalProperties: false
+      required: [scale, comparedSkillsCount, belowRequiredCount, meetsRequiredCount, notDocumentedCount, unknownRequiredLevelCount, conflictCount]
+      description: Conteos por oferta. conflictCount puede solaparse con notDocumentedCount o unknownRequiredLevelCount.
+      properties:
+        scale:
+          type: string
+          enum: [cv-skill-v1]
+        comparedSkillsCount:
+          type: integer
+          minimum: 0
+        belowRequiredCount:
+          type: integer
+          minimum: 0
+        meetsRequiredCount:
+          type: integer
+          minimum: 0
+        notDocumentedCount:
+          type: integer
+          minimum: 0
+        unknownRequiredLevelCount:
+          type: integer
+          minimum: 0
+        conflictCount:
+          type: integer
+          minimum: 0
+    JobCourseRecommendations:
+      type: object
+      additionalProperties: false
+      required: [cvId, dataSource, catalogStatus, results]
+      properties:
+        cvId:
+          $ref: "#/components/schemas/JobSkillsGapId"
+        dataSource:
+          $ref: "#/components/schemas/JobSkillsGapEvaluation/properties/dataSource"
+        catalogStatus:
+          type: string
+          enum: [consulted, not_needed]
+          description: consulted indica lectura exitosa. not_needed indica que ninguna oferta tenía habilidades no documentadas.
+        results:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/JobCourseRecommendationResult"
+    JobCourseRecommendationResult:
+      type: object
+      additionalProperties: false
+      required: [jobId, status, requiredSkillsCount, documentedMatchesCount, documentedCoveragePercent, matchedSkills, notDocumentedSkills, recommendations]
+      properties:
+        jobId:
+          $ref: "#/components/schemas/JobSkillsGapId"
+        status:
+          $ref: "#/components/schemas/JobSkillsGapResult/properties/status"
+        requiredSkillsCount:
+          $ref: "#/components/schemas/JobSkillsGapResult/properties/requiredSkillsCount"
+        documentedMatchesCount:
+          $ref: "#/components/schemas/JobSkillsGapResult/properties/documentedMatchesCount"
+        documentedCoveragePercent:
+          $ref: "#/components/schemas/JobSkillsGapResult/properties/documentedCoveragePercent"
+        matchedSkills:
+          $ref: "#/components/schemas/JobSkillsGapResult/properties/matchedSkills"
+        notDocumentedSkills:
+          $ref: "#/components/schemas/JobSkillsGapResult/properties/notDocumentedSkills"
+        recommendations:
+          type: array
+          description: Una entrada por habilidad no documentada, en el mismo orden. Vacío para ofertas completas o sin información suficiente.
+          items:
+            $ref: "#/components/schemas/SkillCourseRecommendation"
+    SkillCourseRecommendation:
+      type: object
+      additionalProperties: false
+      required: [skillName, catalogMatch, courses]
+      properties:
+        skillName:
+          type: string
+          description: Grafía de la habilidad en la evaluación de la oferta.
+        catalogMatch:
+          type: string
+          enum: [matched, not_found, ambiguous]
+          description: matched indica un nombre único en el catálogo. not_found indica ausencia del nombre y ambiguous indica varios nombres con la misma clave.
+        courses:
+          type: array
+          maxItems: 5
+          description: Cursos asociados elegibles en orden ascendente de ID numérico. Vacío si no hay cursos elegibles o si el nombre es ambiguo o no existe.
+          items:
+            $ref: "#/components/schemas/CatalogCourse"
 servers:
   - url: /
     description: Backend interno; confirmar las rutas y reescrituras de APIM antes de probar el gateway.
