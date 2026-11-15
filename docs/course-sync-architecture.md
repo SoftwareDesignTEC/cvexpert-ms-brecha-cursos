@@ -53,8 +53,11 @@ Solo hasta el plan y su proyección en memoria está implementado en esta fase.
 | `test/fixtures/course-sync.test.ts` | Datos sintéticos, fechas fijas y dominio reservado example.org; no capturas ni evidencia real |
 
 `CatalogSnapshotReader` solo tiene `load`. No existe puerto de escritura en esta fase.
-`next` simula el estado de staging, **no** el catálogo publicado ni un documento de
-importación. Los consumidores deben revisar acciones y snapshot conjuntamente.
+`next` representa únicamente un estado de staging simulado en memoria, **no** el
+catálogo publicado ni un documento de importación. Nunca debe persistirse directamente
+sobre el catálogo publicado: cualquier cambio de publicación requiere la política
+de aprobación correspondiente y un procedimiento de aplicación autorizado.
+Los consumidores deben revisar acciones y snapshot conjuntamente.
 El núcleo no tiene efectos externos; un proveedor inyectado es una frontera de
 confianza. La CLI no acepta ni instancia proveedores reales. Antes de cualquier
 integración real, deben reutilizarse/aprobarse presupuestos, timeouts y autorización
@@ -148,7 +151,9 @@ a cero los contadores de cursos no observados. Las tres ausencias son consecutiv
 entre recorridos completos válidos: un fallo intermedio no cuenta como ausencia
 ni interrumpe esa secuencia. Una observación fresca válida pone el contador a cero,
 incluso si otras páginas fallaron. La fecha de última observación no cambia por
-ausencia. Solo se evalúan registros `sync` del proveedor correspondiente.
+ausencia. Para contar ausencias solo se evalúan registros `sync` del proveedor
+correspondiente cuya publicación no sea `inactive`. Un curso ya inactivo que sigue
+ausente conserva su contador y no genera nuevas propuestas de desactivación.
 
 Política inicial conservadora, pendiente de aprobación operativa: si en una
 ejecución se omitirían o retirarían explícitamente **al menos tres cursos y más
@@ -287,3 +292,16 @@ Siguiente fase requiere nueva instrucción: autorizar fuentes, validar contratos
 cobertura reales, acordar esquema aditivo y propiedad de registros, persistir planes
 y checkpoints con auditoría/concurrencia, implementar revisión/publicación lógica,
 y solo después aprobar identidad, infraestructura y programación diaria.
+
+### Revisión del PR #27: cursos inactivos
+
+El bucle de ausencias omite los cursos con `publication=inactive`, conservando su
+contador y evitando propuestas redundantes de desactivación. Las regresiones cubren
+contadores 0–3, ausencias completas repetidas y un catálogo mixto donde el curso
+publicado sigue proponiendo revisión únicamente al alcanzar la tercera ausencia.
+
+Validación de esta corrección: `npm run build` aprobado;
+`node --import tsx --test test/course-sync.test.ts`, 21/21 aprobadas;
+`npm test`, 111/112 aprobadas. Persiste únicamente el fallo documental preexistente
+por CRLF en `test/documentation.test.ts:78`, fuera del alcance de esta corrección.
+No se implementó persistencia ni se avanzó de fase.

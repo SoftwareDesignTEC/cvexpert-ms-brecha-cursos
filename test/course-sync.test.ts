@@ -58,13 +58,42 @@ test('TEST: actualización de título/duración conserva ID interno y publicaci�
 });
 test('TEST: primera/segunda ausencia conservan curso; tercera propone revisión sin DELETE', () => {
     let state = existing();
+    state.courses.push({ ...structuredClone(state.courses[0]!), internalId: 'TEST-inactive', publication: 'inactive', missingCount: 3,
+        course: candidate({ externalId: 'TEST-inactive', canonicalUrl: 'https://example.org/TEST/inactive' }) });
     for (let n = 1; n <= 3; n++) {
         const input = run({ runId: `TEST-missing-${n}`, observedAt: day(n), candidates: [] });
         const plan = reconcile(state, input);
         assert.equal(plan.next.courses[0]!.missingCount, n);
         assert.equal(plan.actions[0]!.kind, n === 3 ? 'deactivation_candidate' : 'missing');
         assert.equal(plan.next.courses[0]!.publication, 'published');
+        assert.equal(plan.actions.length, 1);
+        assert.equal(plan.actions[0]!.internalId, 'TEST-existing-42');
+        assert.equal(plan.next.courses[1]!.missingCount, 3);
+        assert.equal(plan.next.courses[1]!.publication, 'inactive');
         assert.deepEqual(reconcile(plan.next, input).next, plan.next);
+        state = plan.next;
+    }
+});
+test('TEST: curso inactivo ausente conserva su contador en sincronizaciones completas válidas', () => {
+    for (const missingCount of [0, 1, 2]) {
+        const state = existing();
+        state.courses[0]!.publication = 'inactive';
+        state.courses[0]!.missingCount = missingCount;
+        const plan = reconcile(state, run({ candidates: [] }));
+        assert.equal(plan.absenceEligible, true);
+        assert.deepEqual(plan.next.courses, state.courses);
+        assert.deepEqual(plan.actions, []);
+    }
+});
+test('TEST: curso ya inactivo con tres ausencias no vuelve a proponer desactivación', () => {
+    let state = existing();
+    state.courses[0]!.publication = 'inactive';
+    state.courses[0]!.missingCount = 3;
+    for (let n = 1; n <= 3; n++) {
+        const plan = reconcile(state, run({ runId: `TEST-inactive-${n}`, observedAt: day(n), candidates: [] }));
+        assert.equal(plan.absenceEligible, true);
+        assert.deepEqual(plan.actions, []);
+        assert.deepEqual(plan.next.courses, state.courses);
         state = plan.next;
     }
 });

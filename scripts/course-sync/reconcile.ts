@@ -93,7 +93,7 @@ export function reconcile(snapshot: Snapshot, run: SyncRun): SyncPlan {
         }
     }
     for (const row of managed) {
-        if (seen.has(identity(row.course)) || !plan.absenceEligible) continue;
+        if (row.publication === 'inactive' || seen.has(identity(row.course)) || !plan.absenceEligible) continue;
         row.missingCount = Math.min(3, row.missingCount + 1);
         action(identity(row.course), row, row.missingCount >= 3 ? 'deactivation_candidate' : 'missing',
             row.missingCount >= 3 ? 'THREE_COMPLETE_ABSENCES_REQUIRES_REVIEW' : 'COMPLETE_ABSENCE');
