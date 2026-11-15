@@ -10,6 +10,11 @@ coordinador de descubrimiento mediante un adaptador con transporte exclusivament
 fixture. No habilita acceso real, cobertura completa, persistencia ni publicación;
 mantiene las reglas de aprobación y la semántica de `next` descritas aquí.
 
+La [Fase 2B OpenLearn](providers/openlearn.md) añade un probe local, fixture por
+defecto, con consulta pública real explícita y limitada. Reutiliza el worker de
+consultas y conserva `scope=query`, staging simulado y revisión; la prueba de acceso
+no autoriza sincronización periódica ni publicación automática.
+
 ## Auditoría previa y reutilización
 
 Se partió de `develop` en una rama nueva `codex/course-sync-phase1`. Había archivos

@@ -20,7 +20,8 @@
     "db:admin:sign": "tsx scripts/admin-apply.ts sign",
     "db:admin:apply": "tsx scripts/admin-apply.ts apply",
     "db:admin:verify": "tsx scripts/admin-apply.ts verify",
-    "courses:sync": "tsx scripts/sync-courses.ts"
+    "courses:sync": "tsx scripts/sync-courses.ts",
+    "courses:openlearn:probe": "tsx scripts/probe-openlearn.ts"
   },
   "repository": {
     "type": "git",
