@@ -5,6 +5,11 @@ reales nuevos, PostgreSQL, migraciones, Azure, scheduler ni publicación. No se 
 desde Express ni cambia contratos REST. La futura ejecución diaria en Container
 Apps Jobs es una intención de arquitectura, no infraestructura creada.
 
+La [extensión Saylor de Fase 2A](providers/saylor.md) reutiliza este núcleo y el
+coordinador de descubrimiento mediante un adaptador con transporte exclusivamente
+fixture. No habilita acceso real, cobertura completa, persistencia ni publicación;
+mantiene las reglas de aprobación y la semántica de `next` descritas aquí.
+
 ## Auditoría previa y reutilización
 
 Se partió de `develop` en una rama nueva `codex/course-sync-phase1`. Había archivos

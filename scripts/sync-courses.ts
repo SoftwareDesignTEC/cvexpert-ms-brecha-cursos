@@ -10,7 +10,15 @@ export function runSyncDemo(args: string[]) {
     return { dataSource: 'TEST_SYNTHETIC_ONLY', databaseAccess: false, publicationApproved: false,
         ...reconcile(testSnapshot(), testRun()) };
 }
+export async function runCourseSync(args: string[]) {
+    const providerIndex = args.indexOf('--provider');
+    if (providerIndex < 0) return runSyncDemo(args);
+    if (args[providerIndex + 1] !== 'saylor' || args.lastIndexOf('--provider') !== providerIndex) throw new Error('INVALID_PROVIDER');
+    const { runSaylorDemo } = await import('./course-sync/saylor-demo.js');
+    return runSaylorDemo(args.filter((_, i) => i !== providerIndex && i !== providerIndex + 1));
+}
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-    try { console.log(JSON.stringify(runSyncDemo(process.argv.slice(2)), null, 2)); }
-    catch { console.error('Usar courses:sync -- --dry-run --fixture; no hay modo live ni apply.'); process.exitCode = 1; }
+    runCourseSync(process.argv.slice(2)).then(report => console.log(JSON.stringify(report, null, 2))).catch(() => {
+        console.error('Usar courses:sync -- [--provider saylor] --dry-run --fixture; no hay modo live ni apply.'); process.exitCode = 1;
+    });
 }
