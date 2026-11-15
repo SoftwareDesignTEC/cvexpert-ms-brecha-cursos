@@ -19,7 +19,8 @@
     "db:admin:plan": "tsx scripts/admin-apply.ts plan",
     "db:admin:sign": "tsx scripts/admin-apply.ts sign",
     "db:admin:apply": "tsx scripts/admin-apply.ts apply",
-    "db:admin:verify": "tsx scripts/admin-apply.ts verify"
+    "db:admin:verify": "tsx scripts/admin-apply.ts verify",
+    "courses:sync": "tsx scripts/sync-courses.ts"
   },
   "repository": {
     "type": "git",
