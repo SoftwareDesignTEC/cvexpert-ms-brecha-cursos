@@ -91,6 +91,13 @@ jobs:
           docker exec "$POSTGRES_CONTAINER" psql -U postgres -d cvexpert_ci
           -v ON_ERROR_STOP=1 -c "CREATE ROLE cvexpert_ci LOGIN NOSUPERUSER NOCREATEROLE CREATEDB PASSWORD 'ci-only-disposable-password';"
           -c "CREATE ROLE cvexpert_brecha_app LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB NOINHERIT PASSWORD 'ci-readonly-disposable-password';"
+      - name: Create isolated Course Sync test identities (no catalog grants)
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: >-
+          docker exec "$POSTGRES_CONTAINER" psql -U postgres -d cvexpert_ci -v ON_ERROR_STOP=1
+          -c "CREATE ROLE cvexpert_sync_ingest LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB NOINHERIT PASSWORD 'TEST-sync-ingest-only';"
+          -c "CREATE ROLE cvexpert_sync_editor LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB NOINHERIT PASSWORD 'TEST-sync-editor-only';"
       - name: Prepare disposable administrative roles and local TLS
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}

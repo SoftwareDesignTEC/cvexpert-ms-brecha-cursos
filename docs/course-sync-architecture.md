@@ -315,3 +315,8 @@ Validación de esta corrección: `npm run build` aprobado;
 `npm test`, 111/112 aprobadas. Persiste únicamente el fallo documental preexistente
 por CRLF en `test/documentation.test.ts:78`, fuera del alcance de esta corrección.
 No se implementó persistencia ni se avanzó de fase.
+
+### Fase 3A: persistencia aislada
+
+La fase posterior añade staging PostgreSQL 17 sin publicar ni sustituir este motor.
+Ver [arquitectura, permisos y ejecución local explícita](course-sync-staging-postgres.md).

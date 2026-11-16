@@ -4,6 +4,7 @@ import type { CourseCandidate } from '../course-discovery/model.js';
 export interface SyncCandidate extends Pick<CourseCandidate, 'externalId' | 'title' | 'platform' |
     'canonicalUrl' | 'associatedSkills' | 'language' | 'durationMinutes' | 'isPaid' | 'validation' | 'evidence'> {
     sourceId: string;
+    price?: { amount: string; currency: string } | null;
     lastSeenAt: string;
     modality: 'virtual' | 'presential' | 'hybrid' | 'unknown';
     geography: { country: string | null; region: string | null; locality: string | null } | null;

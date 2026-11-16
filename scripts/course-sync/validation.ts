@@ -34,6 +34,10 @@ export function normalize(value: unknown, sourceId: string, observedAt: string):
     if (timestamp(c.lastSeenAt) > observedAt) throw new Error('FUTURE_OBSERVATION');
     if (c.language !== null) text(c.language, 100);
     if (c.isPaid !== null && typeof c.isPaid !== 'boolean') throw new Error('INVALID_PRICE');
+    if (c.price !== undefined && c.price !== null && (typeof c.price !== 'object' || Array.isArray(c.price)
+        || typeof c.price.amount !== 'string' || !/^(0|[1-9]\d{0,11})(\.\d{1,4})?$/.test(c.price.amount)
+        || typeof c.price.currency !== 'string' || !/^[A-Z]{3}$/.test(c.price.currency)
+        || Object.keys(c.price).sort().join(',') !== 'amount,currency')) throw new Error('INVALID_PRICE');
     if (c.durationMinutes !== null && (!Number.isSafeInteger(c.durationMinutes) || c.durationMinutes <= 0)) throw new Error('INVALID_DURATION');
     if (!Array.isArray(c.associatedSkills) || c.associatedSkills.length > 1000) throw new Error('INVALID_SKILLS');
     const skills = new Map<string, string>();
@@ -70,7 +74,7 @@ export function identity(c: SyncCandidate): string {
 }
 export function metadata(c: SyncCandidate): string {
     return JSON.stringify([c.title, c.platform, c.canonicalUrl, c.associatedSkills, c.language, c.durationMinutes,
-        c.isPaid, c.modality, c.geography && [c.geography.country, c.geography.region, c.geography.locality],
+        c.isPaid, c.price ?? null, c.modality, c.geography && [c.geography.country, c.geography.region, c.geography.locality],
         c.availability, c.offerings.map(o => [o.externalId, o.availability, o.startsAt, o.endsAt,
             o.modality, o.geography && [o.geography.country, o.geography.region, o.geography.locality]]), c.validation]);
 }
