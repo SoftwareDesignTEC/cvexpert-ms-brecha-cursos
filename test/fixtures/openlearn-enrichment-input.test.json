@@ -1,0 +1,122 @@
+{
+  "formatVersion": 1,
+  "batchId": "TEST-only",
+  "vocabulary": {
+    "names": [
+      "TEST SQL"
+    ],
+    "reference": "https://example.org/test-vocabulary",
+    "checkedOn": "2026-01-01"
+  },
+  "candidates": [
+    {
+      "facts": {
+        "sourceId": "TEST-1",
+        "title": "TEST course",
+        "url": "https://www.open.edu/openlearn/test-course/content-section-0",
+        "platform": "TEST OpenLearn",
+        "availability": "available",
+        "language": "TEST language",
+        "level": "TEST Level 1",
+        "durationHours": 4,
+        "isPaid": false,
+        "attribution": "TEST attribution",
+        "metadataLicense": "https://example.org/test-license"
+      },
+      "subjects": [
+        "TEST subject"
+      ],
+      "optionalCosts": null,
+      "pageLicenseNotice": "TEST license notice",
+      "checks": [
+        {
+          "field": "sourceId",
+          "value": "TEST-1",
+          "reference": "https://example.org/test-evidence",
+          "checkedOn": "2026-01-01",
+          "note": "TEST evidence"
+        },
+        {
+          "field": "title",
+          "value": "TEST course",
+          "reference": "https://example.org/test-evidence",
+          "checkedOn": "2026-01-01",
+          "note": "TEST evidence"
+        },
+        {
+          "field": "url",
+          "value": "https://www.open.edu/openlearn/test-course/content-section-0",
+          "reference": "https://example.org/test-evidence",
+          "checkedOn": "2026-01-01",
+          "note": "TEST evidence"
+        },
+        {
+          "field": "platform",
+          "value": "TEST OpenLearn",
+          "reference": "https://example.org/test-evidence",
+          "checkedOn": "2026-01-01",
+          "note": "TEST evidence"
+        },
+        {
+          "field": "availability",
+          "value": "available",
+          "reference": "https://example.org/test-evidence",
+          "checkedOn": "2026-01-01",
+          "note": "TEST evidence"
+        },
+        {
+          "field": "language",
+          "value": "TEST language",
+          "reference": "https://example.org/test-evidence",
+          "checkedOn": "2026-01-01",
+          "note": "TEST evidence"
+        },
+        {
+          "field": "level",
+          "value": "TEST Level 1",
+          "reference": "https://example.org/test-evidence",
+          "checkedOn": "2026-01-01",
+          "note": "TEST evidence"
+        },
+        {
+          "field": "durationHours",
+          "value": 4,
+          "reference": "https://example.org/test-evidence",
+          "checkedOn": "2026-01-01",
+          "note": "TEST evidence"
+        },
+        {
+          "field": "isPaid",
+          "value": false,
+          "reference": "https://example.org/test-evidence",
+          "checkedOn": "2026-01-01",
+          "note": "TEST evidence"
+        },
+        {
+          "field": "attribution",
+          "value": "TEST attribution",
+          "reference": "https://example.org/test-evidence",
+          "checkedOn": "2026-01-01",
+          "note": "TEST evidence"
+        },
+        {
+          "field": "metadataLicense",
+          "value": "https://example.org/test-license",
+          "reference": "https://example.org/test-evidence",
+          "checkedOn": "2026-01-01",
+          "note": "TEST evidence"
+        }
+      ],
+      "skillProposals": [
+        {
+          "label": "TEST proposed skill",
+          "rationale": "TEST learning outcome",
+          "evidenceReference": "https://example.org/test-outcomes",
+          "canonicalName": "TEST SQL",
+          "decision": "approved"
+        }
+      ],
+      "review": null
+    }
+  ]
+}

@@ -1,0 +1,310 @@
+{
+  "formatVersion": 1,
+  "batchId": "openlearn-pilot-2026-11-15",
+  "vocabulary": {
+    "names": [],
+    "reference": null,
+    "checkedOn": null
+  },
+  "candidates": [
+    {
+      "facts": {
+        "sourceId": "1256612",
+        "title": "Climate justice for the next generation",
+        "url": "https://www.open.edu/openlearn/education-development/climate-justice-the-next-generation/content-section-0",
+        "platform": "OpenLearn — The Open University",
+        "availability": "available",
+        "language": null,
+        "level": "Level 2: Intermediate",
+        "durationHours": 7,
+        "isPaid": false,
+        "attribution": "The Open University - OpenLearn metadata. Selección y paráfrasis de CVExpert sin respaldo implícito.",
+        "metadataLicense": "https://creativecommons.org/licenses/by/3.0/"
+      },
+      "subjects": [
+        "Education & Development"
+      ],
+      "optionalCosts": null,
+      "pageLicenseNotice": "Aviso Creative Commons BY-NC con excepciones para terceros. Versión y términos completos pendientes de revisión. La licencia RDF CC BY 3.0 no se extiende al contenido.",
+      "checks": [
+        {
+          "field": "sourceId",
+          "value": "1256612",
+          "reference": "https://github.com/SoftwareDesignTEC/cvexpert-ms-brecha-cursos/blob/fada6a1f039c1d90464ba2f7a16a9a00b4425bd8/docs/providers/openlearn.md",
+          "checkedOn": "2026-11-15",
+          "note": "Dato conservado del contraste documentado en Fase 2B."
+        },
+        {
+          "field": "title",
+          "value": "Climate justice for the next generation",
+          "reference": "https://www.open.edu/openlearn/education-development/climate-justice-the-next-generation/content-section-0",
+          "checkedOn": "2026-11-15",
+          "note": "Página descriptiva accesible mediante herramienta de investigación. No verifica finalización del curso ni todos los servicios."
+        },
+        {
+          "field": "url",
+          "value": "https://www.open.edu/openlearn/education-development/climate-justice-the-next-generation/content-section-0",
+          "reference": "https://www.open.edu/openlearn/education-development/climate-justice-the-next-generation/content-section-0",
+          "checkedOn": "2026-11-15",
+          "note": "Página descriptiva accesible mediante herramienta de investigación. No verifica finalización del curso ni todos los servicios."
+        },
+        {
+          "field": "platform",
+          "value": "OpenLearn — The Open University",
+          "reference": "https://www.open.edu/openlearn/education-development/climate-justice-the-next-generation/content-section-0",
+          "checkedOn": "2026-11-15",
+          "note": "Página descriptiva accesible mediante herramienta de investigación. No verifica finalización del curso ni todos los servicios."
+        },
+        {
+          "field": "availability",
+          "value": "available",
+          "reference": "https://www.open.edu/openlearn/education-development/climate-justice-the-next-generation/content-section-0",
+          "checkedOn": "2026-11-15",
+          "note": "Página descriptiva accesible mediante herramienta de investigación. No verifica finalización del curso ni todos los servicios."
+        },
+        {
+          "field": "level",
+          "value": "Level 2: Intermediate",
+          "reference": "https://www.open.edu/openlearn/education-development/climate-justice-the-next-generation/content-section-0",
+          "checkedOn": "2026-11-15",
+          "note": "Nivel publicado por OpenLearn. No es una certificación ni nivel CV-Skill."
+        },
+        {
+          "field": "durationHours",
+          "value": 7,
+          "reference": "https://www.open.edu/openlearn/education-development/climate-justice-the-next-generation/content-section-0",
+          "checkedOn": "2026-11-15",
+          "note": "About this free course: horas de estudio estimadas, no créditos ni duración mínima obligatoria."
+        },
+        {
+          "field": "isPaid",
+          "value": false,
+          "reference": "https://www.open.edu/openlearn/education-development/climate-justice-the-next-generation/content-section-0",
+          "checkedOn": "2026-11-15",
+          "note": "Señal individual Free course y acceso inicial sin registro. No deducido de la licencia ni de premios gratuitos."
+        },
+        {
+          "field": "attribution",
+          "value": "The Open University - OpenLearn metadata. Selección y paráfrasis de CVExpert sin respaldo implícito.",
+          "reference": "https://data.open.ac.uk/datasets",
+          "checkedOn": "2026-11-15",
+          "note": "Dataset OpenLearn, grafo openlearn2 y licencia CC BY 3.0. Atribución editorial sin respaldo implícito."
+        },
+        {
+          "field": "metadataLicense",
+          "value": "https://creativecommons.org/licenses/by/3.0/",
+          "reference": "https://data.open.ac.uk/datasets",
+          "checkedOn": "2026-11-15",
+          "note": "Dataset OpenLearn, grafo openlearn2 y licencia CC BY 3.0. Atribución editorial sin respaldo implícito."
+        }
+      ],
+      "skillProposals": [
+        {
+          "label": "Relacionar derechos de la infancia y justicia climática",
+          "rationale": "Propuesta editorial basada en Course learning outcomes: relacionar derechos infantiles y efectos del cambio climático. No acredita gestión ambiental ni diseño de políticas.",
+          "evidenceReference": "https://www.open.edu/openlearn/education-development/climate-justice-the-next-generation/content-section-0",
+          "canonicalName": null,
+          "decision": "pending"
+        },
+        {
+          "label": "Explicar el marco de derechos de la infancia de la ONU",
+          "rationale": "Propuesta editorial basada en el resultado sobre la importancia de la UNCRC. No acredita asesoría jurídica.",
+          "evidenceReference": "https://www.open.edu/openlearn/education-development/climate-justice-the-next-generation/content-section-0",
+          "canonicalName": null,
+          "decision": "pending"
+        }
+      ],
+      "review": null
+    },
+    {
+      "facts": {
+        "sourceId": "1586133",
+        "title": "Beginners’ Chinese: a taster course",
+        "url": "https://www.open.edu/openlearn/languages/beginners-chinese-taster-course/content-section-0",
+        "platform": "OpenLearn — The Open University",
+        "availability": "available",
+        "language": null,
+        "level": "Level 1: Introductory",
+        "durationHours": 4,
+        "isPaid": false,
+        "attribution": "The Open University - OpenLearn metadata. Selección y paráfrasis de CVExpert sin respaldo implícito.",
+        "metadataLicense": "https://creativecommons.org/licenses/by/3.0/"
+      },
+      "subjects": [
+        "Languages"
+      ],
+      "optionalCosts": null,
+      "pageLicenseNotice": "Aviso Creative Commons BY-NC con excepciones para terceros. Versión y términos completos pendientes de revisión. La licencia RDF CC BY 3.0 no se extiende al contenido.",
+      "checks": [
+        {
+          "field": "sourceId",
+          "value": "1586133",
+          "reference": "https://github.com/SoftwareDesignTEC/cvexpert-ms-brecha-cursos/blob/fada6a1f039c1d90464ba2f7a16a9a00b4425bd8/docs/providers/openlearn.md",
+          "checkedOn": "2026-11-15",
+          "note": "Dato conservado del contraste documentado en Fase 2B."
+        },
+        {
+          "field": "title",
+          "value": "Beginners’ Chinese: a taster course",
+          "reference": "https://www.open.edu/openlearn/languages/beginners-chinese-taster-course/content-section-0",
+          "checkedOn": "2026-11-15",
+          "note": "Página descriptiva accesible mediante herramienta de investigación. No verifica finalización del curso ni todos los servicios."
+        },
+        {
+          "field": "url",
+          "value": "https://www.open.edu/openlearn/languages/beginners-chinese-taster-course/content-section-0",
+          "reference": "https://www.open.edu/openlearn/languages/beginners-chinese-taster-course/content-section-0",
+          "checkedOn": "2026-11-15",
+          "note": "Página descriptiva accesible mediante herramienta de investigación. No verifica finalización del curso ni todos los servicios."
+        },
+        {
+          "field": "platform",
+          "value": "OpenLearn — The Open University",
+          "reference": "https://www.open.edu/openlearn/languages/beginners-chinese-taster-course/content-section-0",
+          "checkedOn": "2026-11-15",
+          "note": "Página descriptiva accesible mediante herramienta de investigación. No verifica finalización del curso ni todos los servicios."
+        },
+        {
+          "field": "availability",
+          "value": "available",
+          "reference": "https://www.open.edu/openlearn/languages/beginners-chinese-taster-course/content-section-0",
+          "checkedOn": "2026-11-15",
+          "note": "Página descriptiva accesible mediante herramienta de investigación. No verifica finalización del curso ni todos los servicios."
+        },
+        {
+          "field": "level",
+          "value": "Level 1: Introductory",
+          "reference": "https://www.open.edu/openlearn/languages/beginners-chinese-taster-course/content-section-0",
+          "checkedOn": "2026-11-15",
+          "note": "Nivel publicado por OpenLearn. No es una certificación ni nivel CV-Skill."
+        },
+        {
+          "field": "durationHours",
+          "value": 4,
+          "reference": "https://www.open.edu/openlearn/languages/beginners-chinese-taster-course/content-section-0",
+          "checkedOn": "2026-11-15",
+          "note": "About this free course: horas de estudio estimadas, no créditos ni duración mínima obligatoria."
+        },
+        {
+          "field": "isPaid",
+          "value": false,
+          "reference": "https://www.open.edu/openlearn/languages/beginners-chinese-taster-course/content-section-0",
+          "checkedOn": "2026-11-15",
+          "note": "Señal individual Free course y acceso inicial sin registro. No deducido de la licencia ni de premios gratuitos."
+        },
+        {
+          "field": "attribution",
+          "value": "The Open University - OpenLearn metadata. Selección y paráfrasis de CVExpert sin respaldo implícito.",
+          "reference": "https://data.open.ac.uk/datasets",
+          "checkedOn": "2026-11-15",
+          "note": "Dataset OpenLearn, grafo openlearn2 y licencia CC BY 3.0. Atribución editorial sin respaldo implícito."
+        },
+        {
+          "field": "metadataLicense",
+          "value": "https://creativecommons.org/licenses/by/3.0/",
+          "reference": "https://data.open.ac.uk/datasets",
+          "checkedOn": "2026-11-15",
+          "note": "Dataset OpenLearn, grafo openlearn2 y licencia CC BY 3.0. Atribución editorial sin respaldo implícito."
+        }
+      ],
+      "skillProposals": [
+        {
+          "label": "Saludos y presentaciones básicos en mandarín",
+          "rationale": "Los resultados describen vocabulario y pronunciación inicial para saludos, nombres, números y nacionalidades. No acreditan dominio profesional ni fluidez.",
+          "evidenceReference": "https://www.open.edu/openlearn/languages/beginners-chinese-taster-course/content-section-0",
+          "canonicalName": null,
+          "decision": "pending"
+        },
+        {
+          "label": "Reconocer pinyin y tonos del mandarín",
+          "rationale": "El resultado sobre el sistema sonoro respalda una propuesta introductoria, sin equipararla a traducción o interpretación.",
+          "evidenceReference": "https://www.open.edu/openlearn/languages/beginners-chinese-taster-course/content-section-0",
+          "canonicalName": null,
+          "decision": "pending"
+        },
+        {
+          "label": "Configurar la entrada de caracteres chinos",
+          "rationale": "El resultado sobre teclado chino respalda configuración y escritura inicial. No acredita programación.",
+          "evidenceReference": "https://www.open.edu/openlearn/languages/beginners-chinese-taster-course/content-section-0",
+          "canonicalName": null,
+          "decision": "pending"
+        }
+      ],
+      "review": null
+    },
+    {
+      "facts": {
+        "sourceId": "29681",
+        "title": "The Beveridge vision",
+        "url": "https://www.open.edu/openlearn/health-sports-psychology/health/nursing/the-beveridge-vision/content-section-0",
+        "platform": "OpenLearn — The Open University",
+        "availability": "unknown",
+        "language": null,
+        "level": null,
+        "durationHours": null,
+        "isPaid": null,
+        "attribution": "The Open University - OpenLearn metadata. Selección y paráfrasis de CVExpert sin respaldo implícito.",
+        "metadataLicense": "https://creativecommons.org/licenses/by/3.0/"
+      },
+      "subjects": [
+        "Healthcare Careers",
+        "Nursing"
+      ],
+      "optionalCosts": null,
+      "pageLicenseNotice": null,
+      "checks": [
+        {
+          "field": "sourceId",
+          "value": "29681",
+          "reference": "https://github.com/SoftwareDesignTEC/cvexpert-ms-brecha-cursos/blob/fada6a1f039c1d90464ba2f7a16a9a00b4425bd8/docs/providers/openlearn.md",
+          "checkedOn": "2026-11-15",
+          "note": "Dato conservado del contraste documentado en Fase 2B."
+        },
+        {
+          "field": "title",
+          "value": "The Beveridge vision",
+          "reference": "https://github.com/SoftwareDesignTEC/cvexpert-ms-brecha-cursos/blob/fada6a1f039c1d90464ba2f7a16a9a00b4425bd8/docs/providers/openlearn.md",
+          "checkedOn": "2026-11-15",
+          "note": "Dato conservado del contraste documentado en Fase 2B."
+        },
+        {
+          "field": "url",
+          "value": "https://www.open.edu/openlearn/health-sports-psychology/health/nursing/the-beveridge-vision/content-section-0",
+          "reference": "https://github.com/SoftwareDesignTEC/cvexpert-ms-brecha-cursos/blob/fada6a1f039c1d90464ba2f7a16a9a00b4425bd8/docs/providers/openlearn.md",
+          "checkedOn": "2026-11-15",
+          "note": "Dato conservado del contraste documentado en Fase 2B."
+        },
+        {
+          "field": "platform",
+          "value": "OpenLearn — The Open University",
+          "reference": "https://github.com/SoftwareDesignTEC/cvexpert-ms-brecha-cursos/blob/fada6a1f039c1d90464ba2f7a16a9a00b4425bd8/docs/providers/openlearn.md",
+          "checkedOn": "2026-11-15",
+          "note": "Dato conservado del contraste documentado en Fase 2B."
+        },
+        {
+          "field": "availability",
+          "value": "unknown",
+          "reference": "https://www.open.edu/openlearn/health-sports-psychology/health/nursing/the-beveridge-vision/content-section-0",
+          "checkedOn": "2026-11-15",
+          "note": "La herramienta no pudo acceder a esta URL. No prueba retirada ni HTTP 404. Vigencia desconocida."
+        },
+        {
+          "field": "attribution",
+          "value": "The Open University - OpenLearn metadata. Selección y paráfrasis de CVExpert sin respaldo implícito.",
+          "reference": "https://data.open.ac.uk/datasets",
+          "checkedOn": "2026-11-15",
+          "note": "Dataset OpenLearn, grafo openlearn2 y licencia CC BY 3.0. Atribución editorial sin respaldo implícito."
+        },
+        {
+          "field": "metadataLicense",
+          "value": "https://creativecommons.org/licenses/by/3.0/",
+          "reference": "https://data.open.ac.uk/datasets",
+          "checkedOn": "2026-11-15",
+          "note": "Dataset OpenLearn, grafo openlearn2 y licencia CC BY 3.0. Atribución editorial sin respaldo implícito."
+        }
+      ],
+      "skillProposals": [],
+      "review": null
+    }
+  ]
+}
