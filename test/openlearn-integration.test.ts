@@ -18,9 +18,22 @@ test('OpenLearn integración: fixture predeterminado sin red, SQL ni asociacione
     assert.equal(p.rejected.length,2);
     assert.ok(p.run.candidates.every((c: any) => c.associatedSkills.length === 0 && c.durationMinutes === null));
     assert.deepEqual(parsePreparedOpenLearn(p),p);
-    const child = spawnSync(process.execPath,['--permission','--allow-fs-read=*','--import','tsx','scripts/integrate-openlearn-local.ts'],{ encoding: 'utf8' });
+    // Match the enrichment test: native TS transformation + synchronous .js → .ts
+    // resolution avoids tsx/esbuild workers under Node 24's permission model.
+    const script = `import { registerHooks } from 'node:module';
+        import { fileURLToPath } from 'node:url';
+        registerHooks({resolve(s,c,next){try{return next(s,c);}catch(e){if(s.startsWith('.')&&s.endsWith('.js'))return next(s.slice(0,-3)+'.ts',c);throw e;}}});
+        globalThis.fetch = async () => { throw new Error('EXTERNAL_NETWORK_FORBIDDEN'); };
+        const { Pool } = await import('pg');
+        Pool.prototype.connect = () => { throw new Error('POSTGRES_ACCESS_FORBIDDEN'); };
+        Pool.prototype.query = () => { throw new Error('CATALOG_ACCESS_FORBIDDEN'); };
+        process.argv[1] = fileURLToPath(new URL('./scripts/integrate-openlearn-local.ts',import.meta.url));
+        await import('./scripts/integrate-openlearn-local.ts');`;
+    const child = spawnSync(process.execPath,['--permission','--allow-fs-read=*','--experimental-transform-types','--input-type=module','-e',script],
+        { encoding: 'utf8',env: { PATH: process.env.PATH,SystemRoot: process.env.SystemRoot } });
     assert.equal(child.status,0,child.stderr);
     assert.equal(JSON.parse(child.stdout).databaseAccess,false);
+    assert.equal(JSON.parse(child.stdout).publicationApproved,false);
 });
 test('OpenLearn integración: flags cerrados, destino explícito y artefacto inmutable', async () => {
     for (const args of [['--live'],['--live','--apply-local','missing'],['--apply'],['--history-local','extra']]) {
