@@ -88,7 +88,7 @@ export async function verifySession(client: PoolClient, target: Target, mode: 'p
         throw new AdminImportError('Permisos administrativos de auditoría/escritura inválidos.');
     }
     // Pin the historical migration checksums; do not run the migrator or read user snapshots.
-    const expected = await Promise.all(['001_create_catalog.sql', '002_create_market_requirements.sql', '003_create_user_skill_snapshots.sql', '004_create_admin_import_runs.sql']
+    const expected = await Promise.all(['001_create_catalog.sql', '002_create_market_requirements.sql', '003_create_user_skill_snapshots.sql', '004_create_admin_import_runs.sql', '005_create_course_sync_staging.sql']
         .map(async name => ({ name, checksum: createHash('sha256').update((await readFile(new URL(`../../db/migrations/${name}`, import.meta.url), 'utf8')).replace(/\r\n/g, '\n')).digest('hex') })));
     const history = await client.query('SELECT name, checksum FROM public.schema_migrations ORDER BY name');
     if (JSON.stringify(history.rows) !== JSON.stringify(expected)) throw new AdminImportError('Historial de migraciones distinto del revisado; detener y revisar.');
