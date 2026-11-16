@@ -44,7 +44,7 @@ export function openLearnCourseUrl(value: unknown): string {
     if (!/^https:\/\/www\.open\.edu\/openlearn\/[a-z0-9-]+(?:\/[a-z0-9-]+)*\/content-section-0$/u.test(raw)) throw new DiscoveryError('UNSAFE_COURSE_URL');
     return raw; // Preserve the supplied URL. Never invent a URL or upgrade legacy HTTP links.
 }
-function parseRecord(value: unknown): OpenLearnRecord {
+export function parseOpenLearnRecord(value: unknown): OpenLearnRecord {
     const row = object(value);
     if (Object.keys(row).some(k => !variables.includes(k))) throw new DiscoveryError('UNEXPECTED_BINDING');
     const resource = term(row.resource, 'uri');
@@ -55,6 +55,15 @@ function parseRecord(value: unknown): OpenLearnRecord {
     if (internalId !== null && !/^[1-9][0-9]{0,19}$/u.test(internalId)) throw new DiscoveryError('INVALID_EXTERNAL_ID');
     return { resource, type, internalId, title: term(row.title, 'literal'), url: openLearnCourseUrl(term(row.url, 'uri')),
         subject: row.subject === undefined ? null : term(row.subject, 'literal') };
+}
+
+export function candidateFromOpenLearnRecord(record: OpenLearnRecord, at: string, responseSha256: string): CourseCandidate {
+    return { source: 'openlearn',externalId: record.internalId ?? record.resource,title: record.title,platform: 'OpenLearn — The Open University',
+        url: record.url,canonicalUrl: record.url,associatedSkills: [],language: null,levels: [],durationMinutes: null,isPaid: null,
+        queriedAt: at,validation: 'needs_review',reviewReasons: ['PUBLICATION_NOT_APPROVED','CURRENT_COURSE_STATUS_NOT_VERIFIED',
+            'PRICE_LANGUAGE_DURATION_LEVEL_UNVERIFIED','SKILLS_REQUIRE_EDITORIAL_REVIEW'],
+        evidence: [{ apiUrl: openLearnEndpoint,responseSha256,title: record.title,returnedUrl: record.url,queriedAt: at,
+            summary: null,products: [],subjects: record.subject === null ? [] : [record.subject],durationMinutes: null,language: null,levels: [] }] };
 }
 
 export class OpenLearnProvider implements CourseDiscoveryProvider<CourseTopic> {
@@ -147,16 +156,10 @@ export class OpenLearnProvider implements CourseDiscoveryProvider<CourseTopic> {
             const ids = new Set<string>(); let duplicateIds = 0;
             for (const [index, raw] of results.bindings.entries()) {
                 try {
-                    const record = parseRecord(raw), externalId = record.internalId ?? record.resource;
+                    const record = parseOpenLearnRecord(raw), externalId = record.internalId ?? record.resource;
                     records.push(record);
                     if (ids.has(externalId)) duplicateIds++; ids.add(externalId);
-                    candidates.push({ source: this.name, externalId, title: record.title, platform: 'OpenLearn — The Open University',
-                        url: record.url, canonicalUrl: record.url, associatedSkills: [], language: null, levels: [], durationMinutes: null,
-                        isPaid: null, queriedAt: at, validation: 'needs_review', reviewReasons: ['PUBLICATION_NOT_APPROVED',
-                            'CURRENT_COURSE_STATUS_NOT_VERIFIED', 'PRICE_LANGUAGE_DURATION_LEVEL_UNVERIFIED', 'SKILLS_REQUIRE_EDITORIAL_REVIEW'],
-                        evidence: [{ apiUrl: openLearnEndpoint, responseSha256, title: record.title, returnedUrl: record.url, queriedAt: at,
-                            summary: null, products: [], subjects: record.subject === null ? [] : [record.subject],
-                            durationMinutes: null, language: null, levels: [] }] });
+                    candidates.push(candidateFromOpenLearnRecord(record,at,responseSha256));
                 } catch (error) { rejected.push({ index, code: error instanceof DiscoveryError ? error.code : 'INVALID_RECORD' }); }
             }
             this.observation = { at, status: 200, bytes, responseSha256, received: results.bindings.length, accepted: candidates.length,

@@ -1,0 +1,259 @@
+{
+  "formatVersion": 1,
+  "kind": "reviewed-bounded-pilot-summary",
+  "provider": "openlearn",
+  "queryVersion": "openlearn-keyset-v1-dcf3308e4a35d3f5fe91ba4067b49410fba4435f738b86dbe7604a88a50df7d3",
+  "startedAt": "2026-11-16T16:41:57.415Z",
+  "finishedAt": "2026-11-16T16:42:14.654Z",
+  "attribution": "The Open University / OpenLearn metadata. Selected validated fields; no endorsement.",
+  "dataset": "https://data.open.ac.uk/datasets#openlearn",
+  "license": "https://creativecommons.org/licenses/by/3.0/",
+  "scope": "query",
+  "currentCourseStatusVerified": false,
+  "publicationApproved": false,
+  "requestsTotal": 4,
+  "distinctResources": 20,
+  "intersectionAcrossPages": 0,
+  "database": {
+    "candidates": "20",
+    "observations": "21",
+    "runs": "2",
+    "checkpoints": "1",
+    "public_courses": "0",
+    "public_skills": "0",
+    "public_links": "0"
+  },
+  "pages": [
+    {
+      "runId": "67299970-fb73-4c8f-94ce-025b3bc93f51",
+      "artifactSha256": "b7bffe37e3f191e64c2a9d017cd104b4ae735c4050b23aabaa4ee39b61303576",
+      "runSha256": "38868a5d2a1b5b9640ad547b7287307096daa9692160ae1cfeb23528a77cafdc",
+      "cursorBefore": null,
+      "cursorNext": "http://data.open.ac.uk/openlearn/money-business/business-strategy-studies/retail-marketing/content-section-0",
+      "requests": [
+        {
+          "querySha256": "f97b5884b5ffd5ba55a65975893a810a65625d464b0f6c649508aa5b23c168b2",
+          "at": "2026-11-16T16:41:57.621Z",
+          "status": 200,
+          "bytes": 1654,
+          "responseSha256": "559c6704c6690836fd4d5e8eacc2ffcbc50a5ab84584235801f19a9620bf06d9"
+        },
+        {
+          "querySha256": "737d8c38bbff5aa4bbf6b2702279df0040147b5cf53e215ddcdfc9578a49b14c",
+          "at": "2026-11-16T16:42:02.629Z",
+          "status": 200,
+          "bytes": 7430,
+          "responseSha256": "1769bfd89ed0ba4e4ca864e24ca07492471179f6fcb3503b1ab843746e953a51"
+        }
+      ],
+      "courses": [
+        {
+          "resource": "http://data.open.ac.uk/openlearn/education-development/climate-justice-the-next-generation/content-section-0",
+          "externalId": "1256612",
+          "title": "Climate justice for the next generation",
+          "url": "https://www.open.edu/openlearn/education-development/climate-justice-the-next-generation/content-section-0",
+          "categories": [
+            "Education & Development"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/health-sports-psychology/health/nursing/the-beveridge-vision/content-section-0",
+          "externalId": "29681",
+          "title": "The Beveridge vision",
+          "url": "https://www.open.edu/openlearn/health-sports-psychology/health/nursing/the-beveridge-vision/content-section-0",
+          "categories": [
+            "Healthcare Careers",
+            "Nursing"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/health-sports-psychology/social-care-social-work/diversity-and-difference-communication/content-section-0",
+          "externalId": "29768",
+          "title": "Diversity and difference in communication",
+          "url": "https://www.open.edu/openlearn/health-sports-psychology/social-care-social-work/diversity-and-difference-communication/content-section-0",
+          "categories": [
+            "Social Care & Social Work"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/health-sports-psychology/training-speed-and-power-sport-and-fitness/content-section-0",
+          "externalId": "1507038",
+          "title": "Training for speed and power in sport and fitness",
+          "url": "https://www.open.edu/openlearn/health-sports-psychology/training-speed-and-power-sport-and-fitness/content-section-0",
+          "categories": [
+            "Health, Sports & Psychology"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/history-the-arts/religious-studies/religious-diversity-rethinking-religion/content-section-0",
+          "externalId": "449859",
+          "title": "Religious diversity: rethinking religion",
+          "url": "https://www.open.edu/openlearn/history-the-arts/religious-studies/religious-diversity-rethinking-religion/content-section-0",
+          "categories": [
+            "Religious Studies"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/languages/beginners-chinese-taster-course/content-section-0",
+          "externalId": "1586133",
+          "title": "Beginners’ Chinese: a taster course",
+          "url": "https://www.open.edu/openlearn/languages/beginners-chinese-taster-course/content-section-0",
+          "categories": [
+            "Languages"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/money-business/business-strategy-studies/conversations-and-interviews/content-section-0",
+          "externalId": "30055",
+          "title": "Conversations and interviews",
+          "url": "https://www.open.edu/openlearn/money-business/business-strategy-studies/conversations-and-interviews/content-section-0",
+          "categories": [
+            "Business Strategy & Studies"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/money-business/business-strategy-studies/different-types-business/content-section-0",
+          "externalId": "329878",
+          "title": "Different types of business",
+          "url": "https://www.open.edu/openlearn/money-business/business-strategy-studies/different-types-business/content-section-0",
+          "categories": [
+            "Business Strategy & Studies"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/money-business/business-strategy-studies/introduction-business-cultures/content-section-0",
+          "externalId": "30049",
+          "title": "An introduction to business cultures",
+          "url": "https://www.open.edu/openlearn/money-business/business-strategy-studies/introduction-business-cultures/content-section-0",
+          "categories": [
+            "Business Strategy & Studies"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/money-business/business-strategy-studies/retail-marketing/content-section-0",
+          "externalId": "86049",
+          "title": "Retail marketing",
+          "url": "https://www.open.edu/openlearn/money-business/business-strategy-studies/retail-marketing/content-section-0",
+          "categories": [
+            "Business Strategy & Studies"
+          ]
+        }
+      ]
+    },
+    {
+      "runId": "fc900a17-e733-4931-b9c9-5857eaaad6f4",
+      "artifactSha256": "6d9fc534a17ac0706ac0e3b4c41dbef1bda81d6beae0e9435ef62ae1ac6ff24f",
+      "runSha256": "523324fec8bcfdffba806dcab956f2e7d0d9ff10c826b3f3624811f340765cb3",
+      "cursorBefore": "http://data.open.ac.uk/openlearn/money-business/business-strategy-studies/retail-marketing/content-section-0",
+      "cursorNext": "http://data.open.ac.uk/openlearn/money-business/leadership-management/the-importance-interpersonal-skills/content-section-0",
+      "requests": [
+        {
+          "querySha256": "f719a94a480afc0501382c3c9aadd1eea877096480e4b74c233a9f3c3cfc6e33",
+          "at": "2026-11-16T16:42:07.638Z",
+          "status": 200,
+          "bytes": 1672,
+          "responseSha256": "f7b14020548a58b22e7b77be21013d0a117e4b11ee917562dff6acbcef4a76d2"
+        },
+        {
+          "querySha256": "778f962a4bfaaf8f9248a55c29bc0a2be5b6551a1d5dd6fe79f76a99418e8d87",
+          "at": "2026-11-16T16:42:12.641Z",
+          "status": 200,
+          "bytes": 6869,
+          "responseSha256": "0213ba1e15e82cf0415118532834f0979a4b3d8afe8790a71523c2d13b49baca"
+        }
+      ],
+      "courses": [
+        {
+          "resource": "http://data.open.ac.uk/openlearn/money-business/business-strategy-studies/the-life-sciences-industry-introduction/content-section-0",
+          "externalId": "30086",
+          "title": "The life sciences industry: An introduction",
+          "url": "https://www.open.edu/openlearn/money-business/business-strategy-studies/the-life-sciences-industry-introduction/content-section-0",
+          "categories": [
+            "Business Strategy & Studies"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/money-business/business-strategy-studies/working-life-and-learning/content-section-0",
+          "externalId": "30087",
+          "title": "Working life and learning",
+          "url": "https://www.open.edu/openlearn/money-business/business-strategy-studies/working-life-and-learning/content-section-0",
+          "categories": [
+            "Business Strategy & Studies"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/money-business/first-steps-innovation-and-entrepreneurship/content-section-0",
+          "externalId": "348011",
+          "title": "First steps in innovation and entrepreneurship",
+          "url": "https://www.open.edu/openlearn/money-business/first-steps-innovation-and-entrepreneurship/content-section-0",
+          "categories": [
+            "Money & Business"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/money-business/human-resources/using-voluntary-work-get-ahead-the-job-market/content-section-0",
+          "externalId": "30097",
+          "title": "Using voluntary work to get ahead in the job market",
+          "url": "https://www.open.edu/openlearn/money-business/human-resources/using-voluntary-work-get-ahead-the-job-market/content-section-0",
+          "categories": [
+            "Human Resources"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/money-business/introduction-bookkeeping-and-accounting/content-section-0",
+          "externalId": "130381",
+          "title": "Introduction to bookkeeping and accounting",
+          "url": "https://www.open.edu/openlearn/money-business/introduction-bookkeeping-and-accounting/content-section-0",
+          "categories": [
+            "Money & Business"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/money-business/leadership-management/developing-high-trust-work-relationships/content-section-0",
+          "externalId": "353249",
+          "title": "Developing high trust work relationships",
+          "url": "https://www.open.edu/openlearn/money-business/leadership-management/developing-high-trust-work-relationships/content-section-0",
+          "categories": [
+            "Leadership & Management"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/money-business/leadership-management/difference-and-challenge-teams/content-section-0",
+          "externalId": "353235",
+          "title": "Difference and challenge in teams",
+          "url": "https://www.open.edu/openlearn/money-business/leadership-management/difference-and-challenge-teams/content-section-0",
+          "categories": [
+            "Leadership & Management"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/money-business/leadership-management/step-leadership/content-section-0",
+          "externalId": "970481",
+          "title": "Step up to leadership",
+          "url": "https://www.open.edu/openlearn/money-business/leadership-management/step-leadership/content-section-0",
+          "categories": [
+            "Leadership & Management"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/money-business/leadership-management/sure-i-know-how-talk-people/content-section-0",
+          "externalId": "970486",
+          "title": "Sure, I know how to talk to people!",
+          "url": "https://www.open.edu/openlearn/money-business/leadership-management/sure-i-know-how-talk-people/content-section-0",
+          "categories": [
+            "Leadership & Management"
+          ]
+        },
+        {
+          "resource": "http://data.open.ac.uk/openlearn/money-business/leadership-management/the-importance-interpersonal-skills/content-section-0",
+          "externalId": "30112",
+          "title": "The importance of interpersonal skills",
+          "url": "https://www.open.edu/openlearn/money-business/leadership-management/the-importance-interpersonal-skills/content-section-0",
+          "categories": [
+            "Leadership & Management"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -25,7 +25,9 @@
     "courses:openlearn:staging": "tsx scripts/integrate-openlearn-local.ts",
     "courses:official:review": "tsx scripts/review-official-courses.ts",
     "courses:real:demo": "node --import tsx --test test/db/real-courses.test.ts",
-    "courses:openlearn:probe": "tsx scripts/probe-openlearn.ts"
+    "courses:openlearn:probe": "tsx scripts/probe-openlearn.ts",
+    "courses:openlearn:incremental": "tsx scripts/openlearn-incremental-local.ts",
+    "courses:openlearn:incremental:demo": "node --import tsx --test test/db/openlearn-incremental.test.ts"
   },
   "repository": {
     "type": "git",

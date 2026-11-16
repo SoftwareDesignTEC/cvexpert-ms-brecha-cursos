@@ -14,6 +14,10 @@ export interface DiscoveryStore {
     load(): Promise<DiscoveryState>;
     save(state: DiscoveryState): Promise<void>;
 }
+export interface LocalArtifacts {
+    read(name: string): Promise<unknown>;
+    write(name: string, value: unknown): Promise<void>;
+}
 
 export async function readJson(path: string, maxBytes = 1024 * 1024): Promise<unknown> {
     if (!(await lstat(path)).isFile()) throw new DiscoveryError('INVALID_FILE');
@@ -51,7 +55,7 @@ export async function readJson(path: string, maxBytes = 1024 * 1024): Promise<un
 // Un único dueño por directorio; contador persistido antes de cada solicitud.
 // Un lock abandonado requiere revisión manual, nunca se rompe automáticamente.
 export async function withDiscoveryStore<T>(root: string, mode: 'fixture' | 'live',
-    work: (store: DiscoveryStore, writeReport: (report: unknown) => Promise<void>) => Promise<T>): Promise<T> {
+    work: (store: DiscoveryStore, writeReport: (report: unknown) => Promise<void>, artifacts: LocalArtifacts) => Promise<T>): Promise<T> {
     const directory = resolve(root, 'local-catalog-input', 'discovery');
     await mkdir(directory, { recursive: true, mode: 0o700 });
     if ((await realpath(directory)).toLowerCase() !== directory.toLowerCase()) throw new DiscoveryError('UNSAFE_DIRECTORY');
@@ -94,6 +98,14 @@ export async function withDiscoveryStore<T>(root: string, mode: 'fixture' | 'liv
         },
         save: state => atomicWrite(`${mode}-state.json`, state),
     };
-    try { return await work(store, report => atomicWrite(`latest-${mode}.json`, report)); }
+    const safeName = (name: string) => {
+        if (!/^[a-z0-9][a-z0-9.-]{0,180}\.json$/.test(name)) throw new DiscoveryError('UNSAFE_ARTIFACT_NAME');
+        return join(directory,name);
+    };
+    const artifacts: LocalArtifacts = {
+        read: name => readJson(safeName(name),16 * 1024 * 1024),
+        async write(name,value) { safeName(name); await atomicWrite(name,value); },
+    };
+    try { return await work(store, report => atomicWrite(`latest-${mode}.json`, report), artifacts); }
     finally { await lock.close(); await unlink(lockPath); }
 }
