@@ -25,7 +25,10 @@ export async function runOfficialReview(args: string[]) {
         if (report.purpose === 'TEST_ONLY' || !report.catalog) throw new Error('NO_OPERATIONAL_CATALOG_ELIGIBLE');
         return report.catalog;
     }
-    return report;
+    // Keep diagnostics, never serialize the test-only import document through report.
+    return report.purpose === 'TEST_ONLY'
+        ? { ...report,catalog: null,catalogSuppressedReason: 'TEST_ONLY' }
+        : report;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
     runOfficialReview(process.argv.slice(2)).then(r => console.log(JSON.stringify(r,null,2)))

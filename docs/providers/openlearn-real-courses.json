@@ -20,8 +20,8 @@
       "language": null,
       "learningOutcomes": ["Escribir código Python sencillo e interpretar secuencias y repeticiones."],
       "skillProposals": [{"label": "Python", "rationale": "Los resultados describen producir código Python y comprender secuencias y repetición. Alcance introductorio, sin acreditar dominio avanzado."}],
-      "evidenceSections": ["Course learning outcomes", "Free course", "About this free course", "Copyright information"],
-      "operationalWarnings": ["Página descriptiva accesible y señal de inicio. No se verificaron herramientas externas, actividades ni finalización."],
+      "evidenceSections": ["Course learning outcomes", "Free course", "About this free course", "Copyright information", "Course reviews (consulta 2026-11-16, reseña de usuario 2026-10-18)"],
+      "operationalWarnings": ["Página descriptiva accesible y señal de inicio. No se verificaron herramientas externas, actividades ni finalización.", "En reseñas de usuarios de la página oficial se reportan dificultades con Trinket y ejercicios interactivos (reseña del 2026-10-18, consultada el 2026-11-16). Es un reporte de usuario, no un fallo técnico confirmado. Antes de aprobar publicación operativa, la persona revisora debe comprobar que las actividades esenciales aún funcionan y registrar el resultado de esa comprobación. La reseña no demuestra retirada del curso."],
       "rdfIdentity": null,
       "editorialStatus": "pending"
     },

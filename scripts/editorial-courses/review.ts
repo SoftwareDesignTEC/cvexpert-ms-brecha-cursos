@@ -110,6 +110,9 @@ export function prepareEditorialCatalog(value: unknown, reviewValue?: unknown) {
             || review.vocabulary.checkedOn && review.reviewedAt.slice(0,10) < review.vocabulary.checkedOn)) blockers.push('REVIEW_PREDATES_EVIDENCE');
         if (decision) {
             checks.forEach(k => { if (!decision.confirmations[k]) blockers.push(`CONFIRM_${k.toUpperCase()}`); });
+            if (decision.decision === 'approved' && c.operationalWarnings.length && !decision.note) {
+                blockers.push('WARNINGS_ASSESSMENT_REQUIRED');
+            }
             if (decision.associations.length && (!review.vocabulary.reference || !review.vocabulary.checkedOn)) blockers.push('VOCABULARY_UNVERIFIED');
             for (const a of decision.associations) {
                 if (!c.skillProposals.some(p => p.label === a.proposal)) blockers.push('UNKNOWN_SKILL_PROPOSAL');

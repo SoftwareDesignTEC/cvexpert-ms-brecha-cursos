@@ -13,6 +13,15 @@ afirmar formación avanzada, dominio profesional, certificación o habilidades a
 La página muestra publicación/actualización de 2018; su lectura no garantiza vigencia
 de actividades, servicios opcionales o finalización del curso. No se revisaron lecciones.
 
+Actualización **2026-11-16**: en la sección de reseñas de esa misma página, una reseña
+de usuario del **2026-10-18** reporta dificultades con Trinket y ejercicios interactivos.
+No se reprodujo el problema: es una advertencia reportada por usuarios, **no un fallo
+técnico confirmado** ni evidencia de retirada. La persona revisora debe comprobar que
+las actividades esenciales siguen funcionando antes de aprobar publicación operativa,
+registrar resultado/fecha/referencia y dejar pendiente si no puede confirmarlo. La
+disponibilidad de la página descriptiva permanece igual. El registro editorial y el
+informe pendiente de fase 4B incluyen esta advertencia y su nuevo hash de contenido.
+
 | Campo editorial posible | Evidencia / decisión |
 | --- | --- |
 | URL | URL oficial anterior, conservada literalmente |

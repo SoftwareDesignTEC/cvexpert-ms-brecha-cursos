@@ -9,7 +9,7 @@ export const testReviewTime = '2026-11-16T00:00:00.000Z';
 export function testCourseReview(registry: OfficialRegistry, vocabulary: { names: string[]; reference: string; checkedOn: string }) {
     const review = reviewTemplate(registry);
     review.purpose = 'TEST_ONLY'; review.reviewer = 'TEST automated fixture, no human approval'; review.reviewedAt = testReviewTime;
-    review.vocabulary = vocabulary;
+    review.vocabulary = structuredClone(vocabulary);
     for (const d of review.decisions) {
         const candidate = registry.candidates.find(c => c.url === d.url)!;
         if (!['Simple coding','Network security'].includes(candidate.title)) continue;

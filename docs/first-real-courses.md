@@ -128,7 +128,9 @@ node --import tsx scripts/review-official-courses.ts catalog --file docs/provide
 
 Se usa Node directamente al redirigir JSON para evitar los banners de npm en el archivo.
 Con la plantilla pendiente, `catalog` falla sin emitir un lote. También rechaza exportar
-como operativo cualquier propósito `TEST_ONLY`. No hay `--apply` ni acceso SQL en esta CLI.
+como operativo cualquier propósito `TEST_ONLY`. En `report`, ese propósito conserva
+filas, bloqueos, evaluación y hash, pero devuelve `catalog=null` y
+`catalogSuppressedReason=TEST_ONLY`. No hay `--apply` ni acceso SQL en esta CLI.
 
 ## Demostración reproducible con PostgreSQL 17
 
@@ -314,6 +316,58 @@ Archivos de la entrega:
 - `package.json`: comandos de revisión y demostración.
 - `docs/first-real-courses.md`: este informe, evidencia, comandos y bloqueos operativos.
 
-No se modifican migraciones, adaptadores, conciliación, importadores administrativos,
+La entrega original no modificó migraciones, adaptadores, conciliación, importadores administrativos,
 permisos existentes, repositorios HTTP, REST, Android, FCM o Azure. No hubo publicación
 productiva, aprobación humana, firma operativa, push, merge ni despliegue.
+
+## Corrección PR #33 — 2026-11-16
+
+El informe original podía serializar un CatalogDocument TEST_ONLY aunque `catalog`
+rechazara exportarlo. Se cierra ese canal de extracción en la CLI: los diagnósticos
+permanecen, pero el documento de prueba no sale por `report`. La función interna sigue
+generándolo para las pruebas PostgreSQL y el importador local permanece sin cambios.
+
+Se añade una segunda barrera en `prepareInput()`, compartida por la entrada administrativa:
+rechaza `batchId` con el prefijo reservado **TEST-**, o **TEST_ONLY** completo/seguido de
+`-`, `_` o `:`. La comprobación se aplica incluso con mercado y escala formalmente válidos.
+No busca palabras comunes en títulos. El fixture general de importación se renombra a
+`fixture-only-never-production`, conservando sus títulos `[TEST]`, URLs y evidencia
+sintéticos, para que las suites administrativas ejerciten el camino ordinario sin
+excepciones al guard. Las firmas, autorizaciones, identidad, TLS y demás barreras no cambian.
+
+La nueva regresión detectó que el helper TEST compartía y mutaba el vocabulario del
+llamador: ahora lo clona. Es aislamiento de fixtures; no cambia el vocabulario operativo.
+La rama ordinaria se prueba con metadatos reales y un revisor simulado explícitamente
+TEST, sin presentar esa simulación como una aprobación humana auténtica.
+
+En la [página de Simple coding](https://www.open.edu/openlearn/digital-computing/simple-coding/content-section-0),
+la reseña de usuario del **2026-10-18**, consultada el **2026-11-16**, reporta problemas
+con Trinket y ejercicios interactivos. Es **reporte de usuario, no fallo técnico confirmado**.
+No se cambia `availability=page_accessible`, precio ni se declara retirada. Antes de aprobar
+una publicación operativa, el revisor debe comprobar las actividades esenciales y
+registrar resultado, fecha y referencia en su nota/evidencia; confirmar disponibilidad
+y advertencias requiere haber realizado esa comprobación. Si no puede hacerlo, debe
+dejar el curso pendiente. `confirmations.warnings=false` bloquea la elegibilidad.
+Además, una decisión aprobada para un candidato con advertencias requiere una nota
+no vacía (`WARNINGS_ASSESSMENT_REQUIRED`); esa nota debe documentar la comprobación.
+Su presencia no demuestra por sí sola que un ejercicio funcione: el resultado es
+responsabilidad de la persona revisora, y la aprobación/sello operativo siguen separados.
+
+El registro conserva la fecha original de los metadatos, añade la fecha de consulta de
+la reseña en la evidencia/advertencia y cambia el hash editorial. Se regeneraron ambos
+artefactos pendientes: el informe tiene el hash nuevo, y la plantilla mantiene
+`contentSha256=null`, sin fabricar aprobación. Las revisiones de contenido anterior
+deben volver a contrastarse y confirmarse; cambiar el hash no resuelve la vigencia.
+
+Estas barreras separan los artefactos marcados de prueba de las entradas administrativas;
+no autentican la identidad de un revisor ni certifican contenido al que se quite o cambie
+manualmente el marcador. Siguen siendo obligatorios revisión humana, documentos reales
+de mercado/escala, derechos, firma, destino autorizado y ventana operativa. No se firma,
+publica, hace merge ni despliega como parte de esta corrección.
+
+Verificación de la corrección: build aprobado, `npm test` **174/174**, `npm run db:test`
+**116/116** (incluido el flujo administrativo de fixtures con TLS),
+`npm run courses:real:demo` **5/5**, controles de workflows **52/52**, auditoría **0
+vulnerabilidades** y diff-check sin errores. Se mantuvo PostgreSQL 17 desechable y no
+se omitieron pruebas DB. La comparación LF preexistente se normalizó temporalmente
+en Windows y se restauró, sin cambiar sus assertions.
