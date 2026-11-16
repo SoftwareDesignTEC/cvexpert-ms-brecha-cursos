@@ -22,6 +22,7 @@
     "db:admin:verify": "tsx scripts/admin-apply.ts verify",
     "courses:sync": "tsx scripts/sync-courses.ts",
     "courses:sync:local": "tsx scripts/sync-courses-local.ts",
+    "courses:openlearn:staging": "tsx scripts/integrate-openlearn-local.ts",
     "courses:openlearn:probe": "tsx scripts/probe-openlearn.ts"
   },
   "repository": {

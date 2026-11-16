@@ -132,6 +132,19 @@ export function createPostgresStaging(pool: Pool): CourseSyncStaging {
                 await c.query('COMMIT'); return { snapshot, versions };
             } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
         },
+        async history(sourceId, limit = 20) {
+            text(sourceId,128);
+            if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error('INVALID_HISTORY_LIMIT');
+            const c = await pool.connect();
+            try {
+                await c.query('BEGIN READ ONLY'); await verify(c);
+                const rows = (await c.query(`SELECT run_id,observed_at,scope,status,coverage,result FROM course_sync.runs
+                    WHERE source_id=$1 ORDER BY recorded_at DESC,run_id DESC LIMIT $2`,[sourceId,limit])).rows;
+                await c.query('COMMIT');
+                return rows.map(r => ({ runId: r.run_id,observedAt: r.observed_at.toISOString(),
+                    scope: r.scope,status: r.status,coverage: r.coverage,result: r.result }));
+            } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
+        },
         async execute(value, expectedVersions = {}) {
             const run = structuredClone(value); validateRun(run);
             const hash = createHash('sha256').update(canonical({ run, expectedVersions })).digest('hex');
