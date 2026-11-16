@@ -1,5 +1,9 @@
 # Fase 4A — OpenLearn a staging PostgreSQL
 
+La [Fase 4C1 incremental](course-sync-openlearn-incremental.md) añade comandos separados
+con cursor, artefactos recuperables y presupuesto local durable. Los comandos y el SELECT
+acotado descritos en esta Fase 4A conservan su comportamiento.
+
 Base: `origin/develop` **a24543e**, merge de #31, incluye PR #27–#31.
 Rama `codex/course-sync-openlearn-staging-integration`, worktree aislado
 `.worktrees/course-sync-openlearn-staging-integration`. No se copiaron datos operativos
