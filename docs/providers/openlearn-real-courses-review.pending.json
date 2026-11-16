@@ -1,0 +1,104 @@
+{
+  "formatVersion": 1,
+  "purpose": "editorial_review",
+  "reviewer": null,
+  "reviewedAt": null,
+  "contentSha256": null,
+  "vocabulary": {
+    "names": [],
+    "reference": null,
+    "checkedOn": null
+  },
+  "decisions": [
+    {
+      "url": "https://www.open.edu/openlearn/digital-computing/simple-coding/content-section-0",
+      "decision": "pending",
+      "associations": [],
+      "confirmations": {
+        "title": false,
+        "url": false,
+        "cost": false,
+        "availability": false,
+        "rights": false,
+        "warnings": false
+      },
+      "noSkillsReason": null,
+      "note": null
+    },
+    {
+      "url": "https://www.open.edu/openlearn/digital-computing/network-security/content-section-0",
+      "decision": "pending",
+      "associations": [],
+      "confirmations": {
+        "title": false,
+        "url": false,
+        "cost": false,
+        "availability": false,
+        "rights": false,
+        "warnings": false
+      },
+      "noSkillsReason": null,
+      "note": null
+    },
+    {
+      "url": "https://www.open.edu/openlearn/digital-computing/introduction-cyber-security-stay-safe-online/",
+      "decision": "pending",
+      "associations": [],
+      "confirmations": {
+        "title": false,
+        "url": false,
+        "cost": false,
+        "availability": false,
+        "rights": false,
+        "warnings": false
+      },
+      "noSkillsReason": null,
+      "note": null
+    },
+    {
+      "url": "https://www.open.edu/openlearn/science-maths-technology/an-introduction-interaction-design/content-section-0",
+      "decision": "pending",
+      "associations": [],
+      "confirmations": {
+        "title": false,
+        "url": false,
+        "cost": false,
+        "availability": false,
+        "rights": false,
+        "warnings": false
+      },
+      "noSkillsReason": null,
+      "note": null
+    },
+    {
+      "url": "https://www.open.edu/openlearn/science-maths-technology/an-introduction-software-development/content-section-0",
+      "decision": "pending",
+      "associations": [],
+      "confirmations": {
+        "title": false,
+        "url": false,
+        "cost": false,
+        "availability": false,
+        "rights": false,
+        "warnings": false
+      },
+      "noSkillsReason": null,
+      "note": null
+    },
+    {
+      "url": "https://www.open.edu/openlearn/digital-computing/learn-code-data-analysis/content-section-overview",
+      "decision": "pending",
+      "associations": [],
+      "confirmations": {
+        "title": false,
+        "url": false,
+        "cost": false,
+        "availability": false,
+        "rights": false,
+        "warnings": false
+      },
+      "noSkillsReason": null,
+      "note": null
+    }
+  ]
+}

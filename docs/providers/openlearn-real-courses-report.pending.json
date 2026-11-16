@@ -1,0 +1,110 @@
+{
+  "authorizedToPublish": false,
+  "purpose": "editorial_review",
+  "contentSha256": "529cdc37dc99814d6d510fce038cc5f30fc63001869e6f49eda679c7e1c1b68e",
+  "rows": [
+    {
+      "url": "https://www.open.edu/openlearn/digital-computing/simple-coding/content-section-0",
+      "title": "Simple coding",
+      "status": "pending",
+      "blockers": [
+        "EXPLICIT_REVIEW_REQUIRED",
+        "REVIEWER_AND_TIME_REQUIRED",
+        "REVIEW_CONTENT_NOT_CONFIRMED",
+        "CONFIRM_TITLE",
+        "CONFIRM_URL",
+        "CONFIRM_COST",
+        "CONFIRM_AVAILABILITY",
+        "CONFIRM_RIGHTS",
+        "CONFIRM_WARNINGS",
+        "NO_SKILLS_JUSTIFICATION_REQUIRED"
+      ]
+    },
+    {
+      "url": "https://www.open.edu/openlearn/digital-computing/network-security/content-section-0",
+      "title": "Network security",
+      "status": "pending",
+      "blockers": [
+        "EXPLICIT_REVIEW_REQUIRED",
+        "REVIEWER_AND_TIME_REQUIRED",
+        "REVIEW_CONTENT_NOT_CONFIRMED",
+        "CONFIRM_TITLE",
+        "CONFIRM_URL",
+        "CONFIRM_COST",
+        "CONFIRM_AVAILABILITY",
+        "CONFIRM_RIGHTS",
+        "CONFIRM_WARNINGS",
+        "NO_SKILLS_JUSTIFICATION_REQUIRED"
+      ]
+    },
+    {
+      "url": "https://www.open.edu/openlearn/digital-computing/introduction-cyber-security-stay-safe-online/",
+      "title": "Introduction to cyber security: stay safe online",
+      "status": "pending",
+      "blockers": [
+        "EXPLICIT_REVIEW_REQUIRED",
+        "REVIEWER_AND_TIME_REQUIRED",
+        "REVIEW_CONTENT_NOT_CONFIRMED",
+        "CONFIRM_TITLE",
+        "CONFIRM_URL",
+        "CONFIRM_COST",
+        "CONFIRM_AVAILABILITY",
+        "CONFIRM_RIGHTS",
+        "CONFIRM_WARNINGS",
+        "NO_SKILLS_JUSTIFICATION_REQUIRED"
+      ]
+    },
+    {
+      "url": "https://www.open.edu/openlearn/science-maths-technology/an-introduction-interaction-design/content-section-0",
+      "title": "An introduction to interaction design",
+      "status": "pending",
+      "blockers": [
+        "EXPLICIT_REVIEW_REQUIRED",
+        "REVIEWER_AND_TIME_REQUIRED",
+        "REVIEW_CONTENT_NOT_CONFIRMED",
+        "CONFIRM_TITLE",
+        "CONFIRM_URL",
+        "CONFIRM_COST",
+        "CONFIRM_AVAILABILITY",
+        "CONFIRM_RIGHTS",
+        "CONFIRM_WARNINGS",
+        "NO_SKILLS_JUSTIFICATION_REQUIRED"
+      ]
+    },
+    {
+      "url": "https://www.open.edu/openlearn/science-maths-technology/an-introduction-software-development/content-section-0",
+      "title": "An introduction to software development",
+      "status": "pending",
+      "blockers": [
+        "EXPLICIT_REVIEW_REQUIRED",
+        "REVIEWER_AND_TIME_REQUIRED",
+        "REVIEW_CONTENT_NOT_CONFIRMED",
+        "CONFIRM_TITLE",
+        "CONFIRM_URL",
+        "CONFIRM_COST",
+        "CONFIRM_AVAILABILITY",
+        "CONFIRM_RIGHTS",
+        "CONFIRM_WARNINGS",
+        "NO_SKILLS_JUSTIFICATION_REQUIRED"
+      ]
+    },
+    {
+      "url": "https://www.open.edu/openlearn/digital-computing/learn-code-data-analysis/content-section-overview",
+      "title": "Learn to code for data analysis",
+      "status": "pending",
+      "blockers": [
+        "EXPLICIT_REVIEW_REQUIRED",
+        "REVIEWER_AND_TIME_REQUIRED",
+        "REVIEW_CONTENT_NOT_CONFIRMED",
+        "CONFIRM_TITLE",
+        "CONFIRM_URL",
+        "CONFIRM_COST",
+        "CONFIRM_AVAILABILITY",
+        "CONFIRM_RIGHTS",
+        "CONFIRM_WARNINGS",
+        "NO_SKILLS_JUSTIFICATION_REQUIRED"
+      ]
+    }
+  ],
+  "catalog": null
+}

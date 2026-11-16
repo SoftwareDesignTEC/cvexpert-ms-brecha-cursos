@@ -1,0 +1,136 @@
+{
+  "formatVersion": 1,
+  "batchId": "openlearn-official-pages-2026-11-15",
+  "sourceKind": "editorial_official_page_url",
+  "checkedOn": "2026-11-15",
+  "attribution": "The Open University / OpenLearn. Minimal descriptive metadata and paraphrased learning outcomes. No affiliation or endorsement.",
+  "rightsReference": "https://www.open.edu/openlearn/about-openlearn/frequently-asked-questions-on-openlearn",
+  "rightsStatus": "pending_human_review",
+  "candidates": [
+    {
+      "url": "https://www.open.edu/openlearn/digital-computing/simple-coding/content-section-0",
+      "aliases": [],
+      "title": "Simple coding",
+      "platform": "OpenLearn — The Open University",
+      "availability": "page_accessible",
+      "isPaid": false,
+      "optionalCosts": null,
+      "durationHours": 2,
+      "providerLevel": "Level 1: Introductory",
+      "language": null,
+      "learningOutcomes": ["Escribir código Python sencillo e interpretar secuencias y repeticiones."],
+      "skillProposals": [{"label": "Python", "rationale": "Los resultados describen producir código Python y comprender secuencias y repetición. Alcance introductorio, sin acreditar dominio avanzado."}],
+      "evidenceSections": ["Course learning outcomes", "Free course", "About this free course", "Copyright information", "Course reviews (consulta 2026-11-16, reseña de usuario 2026-10-18)"],
+      "operationalWarnings": ["Página descriptiva accesible y señal de inicio. No se verificaron herramientas externas, actividades ni finalización.", "En reseñas de usuarios de la página oficial se reportan dificultades con Trinket y ejercicios interactivos (reseña del 2026-10-18, consultada el 2026-11-16). Es un reporte de usuario, no un fallo técnico confirmado. Antes de aprobar publicación operativa, la persona revisora debe comprobar que las actividades esenciales aún funcionan y registrar el resultado de esa comprobación. La reseña no demuestra retirada del curso."],
+      "rdfIdentity": null,
+      "editorialStatus": "pending"
+    },
+    {
+      "url": "https://www.open.edu/openlearn/digital-computing/network-security/content-section-0",
+      "aliases": [],
+      "title": "Network security",
+      "platform": "OpenLearn — The Open University",
+      "availability": "page_accessible",
+      "isPaid": false,
+      "optionalCosts": null,
+      "durationHours": 25,
+      "providerLevel": "Level 3: Advanced",
+      "language": null,
+      "learningOutcomes": ["Clasificar ataques y puntos vulnerables de redes, y comparar cifrado simétrico, asimétrico e híbrido."],
+      "skillProposals": [
+        {"label": "Seguridad de redes", "rationale": "Resultados sobre necesidad de protección, ataques y vulnerabilidades en redes."},
+        {"label": "Ciberseguridad", "rationale": "Propuesta de alcance de seguridad de redes, a contrastar con el significado del nombre canónico."},
+        {"label": "Criptografía", "rationale": "Los resultados comparan sistemas de cifrado y su vulnerabilidad. No se acredita dominio de toda la criptografía."}
+      ],
+      "evidenceSections": ["Course learning outcomes", "Free course", "About this free course", "Copyright information"],
+      "operationalWarnings": ["La descripción exige conocimientos sustanciales de informática. Nivel del proveedor no equivale a nivel CVExpert."],
+      "rdfIdentity": null,
+      "editorialStatus": "pending"
+    },
+    {
+      "url": "https://www.open.edu/openlearn/digital-computing/introduction-cyber-security-stay-safe-online/",
+      "aliases": [],
+      "title": "Introduction to cyber security: stay safe online",
+      "platform": "OpenLearn — The Open University",
+      "availability": "page_accessible",
+      "isPaid": false,
+      "optionalCosts": null,
+      "durationHours": 24,
+      "providerLevel": "Level 1: Introductory",
+      "language": null,
+      "learningOutcomes": ["Reconocer amenazas digitales y reducir riesgos personales, con conceptos de malware, redes, cifrado y suplantación."],
+      "skillProposals": [
+        {"label": "Ciberseguridad", "rationale": "Los resultados describen reconocer amenazas y proteger la vida digital."},
+        {"label": "Seguridad informática básica", "rationale": "Propuesta introductoria sobre amenazas y mitigación, pendiente de nombre canónico exacto."}
+      ],
+      "evidenceSections": ["Course learning outcomes", "Course description", "About this free course", "Copyright information"],
+      "operationalWarnings": ["Se conserva la URL oficial de portada. No se fabrica una URL content-section-0 ni una identidad RDF."],
+      "rdfIdentity": null,
+      "editorialStatus": "pending"
+    },
+    {
+      "url": "https://www.open.edu/openlearn/science-maths-technology/an-introduction-interaction-design/content-section-0",
+      "aliases": [],
+      "title": "An introduction to interaction design",
+      "platform": "OpenLearn — The Open University",
+      "availability": "page_accessible",
+      "isPaid": false,
+      "optionalCosts": null,
+      "durationHours": 10,
+      "providerLevel": "Level 2: Intermediate",
+      "language": null,
+      "learningOutcomes": ["Aplicar diseño centrado en usuarios, obtener requisitos, prototipar y evaluar productos interactivos de forma iterativa."],
+      "skillProposals": [
+        {"label": "Diseño de interacción", "rationale": "Resultados explícitos sobre procesos y técnicas de diseño de productos interactivos."},
+        {"label": "Usabilidad", "rationale": "Propuesta basada en capacidades de usuarios, evaluación y crítica de productos. Revisar alcance canónico."},
+        {"label": "UX", "rationale": "La descripción aborda experiencia de usuario y diseño centrado en usuarios. No se infiere una equivalencia automática de nombres."}
+      ],
+      "evidenceSections": ["Course learning outcomes", "Course description", "About this free course", "Copyright information"],
+      "operationalWarnings": ["Las propuestas UX y usabilidad requieren revisión semántica individual y vocabulario contrastado."],
+      "rdfIdentity": null,
+      "editorialStatus": "pending"
+    },
+    {
+      "url": "https://www.open.edu/openlearn/science-maths-technology/an-introduction-software-development/content-section-0",
+      "aliases": [],
+      "title": "An introduction to software development",
+      "platform": "OpenLearn — The Open University",
+      "availability": "page_accessible",
+      "isPaid": false,
+      "optionalCosts": null,
+      "durationHours": 6,
+      "providerLevel": "Level 3: Advanced",
+      "language": null,
+      "learningOutcomes": ["Explicar actividades de ingeniería de software, modelado, riesgo, calidad y fundamentos de orientación a objetos."],
+      "skillProposals": [
+        {"label": "Ingeniería de software", "rationale": "Resultados sobre naturaleza de ingeniería, actividades, riesgo y calidad."},
+        {"label": "Programación orientada a objetos", "rationale": "Resultados sobre fundamentos del enfoque orientado a objetos. No prueba dominio práctico avanzado de un lenguaje."}
+      ],
+      "evidenceSections": ["Course learning outcomes", "Free course", "About this free course", "Copyright information"],
+      "operationalWarnings": ["Aunque el título dice introducción, la ficha declara Level 3: Advanced. Se conserva esa distinción sin mapearla a niveles CVExpert."],
+      "rdfIdentity": null,
+      "editorialStatus": "pending"
+    },
+    {
+      "url": "https://www.open.edu/openlearn/digital-computing/learn-code-data-analysis/content-section-overview",
+      "aliases": ["https://www.open.edu/openlearn/science-maths-technology/learn-code-data-analysis/content-section-overview"],
+      "title": "Learn to code for data analysis",
+      "platform": "OpenLearn — The Open University",
+      "availability": "page_accessible",
+      "isPaid": false,
+      "optionalCosts": null,
+      "durationHours": 24,
+      "providerLevel": "Level 1: Introductory",
+      "language": null,
+      "learningOutcomes": ["Desarrollar programas sencillos para analizar datos abiertos. La descripción identifica Python y Jupyter para los ejercicios."],
+      "skillProposals": [
+        {"label": "Python", "rationale": "La descripción identifica Python y los resultados incluyen escribir programas de análisis. Alcance introductorio."},
+        {"label": "Análisis de datos", "rationale": "Resultados sobre conceptos básicos, fuentes abiertas y programas de análisis."}
+      ],
+      "evidenceSections": ["Course description", "Course learning outcomes", "About this free course", "Copyright information"],
+      "operationalWarnings": ["La página oficial advierte problemas reportados con software y cuestionarios. Debe comprobarse su impacto antes de publicar.", "La URL science-maths-technology redirigió a digital-computing. Se registra como alias, no como otro curso."],
+      "rdfIdentity": null,
+      "editorialStatus": "pending"
+    }
+  ]
+}

@@ -16,6 +16,9 @@ export function prepareInput(catalog: unknown, market: unknown, scaleValue: unkn
         throw new AdminImportError('cv-skill-v1 requiere exactamente los niveles ordinales [1,2,3,4].');
     }
     const input = { catalog: parseCatalogDocument(catalog), market: parseImportDocument(market, scale), scale };
+    if (input.catalog.batchId.startsWith('TEST-') || /^TEST_ONLY(?:$|[-_:])/.test(input.catalog.batchId)) {
+        throw new AdminImportError('El procedimiento administrativo rechaza lotes TEST_ONLY (batchId reservado TEST- o TEST_ONLY).');
+    }
     if (input.market.records.some(r => r.dataKind !== 'reference')) throw new AdminImportError('El procedimiento administrativo rechaza requisitos demo.');
     if ([...input.catalog.skills, ...input.catalog.courses.flatMap(c => [c.title, ...c.skills])].some(v => v.includes('[DEMO]'))) {
         throw new AdminImportError('El catálogo administrativo rechaza marcadores DEMO.');
