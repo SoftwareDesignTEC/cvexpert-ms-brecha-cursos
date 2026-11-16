@@ -1,6 +1,11 @@
 # cvexpert-ms-brecha-cursos
 Microservicio de brecha de habilidades y recomendación de cursos de CVExpert
 
+Ingesta automática de OpenLearn y freeCodeCamp al catálogo existente:
+`npm run build` y `npm run courses:ingest:once`, con identidad INSERT-only separada.
+[Configuración y demostración real PostgreSQL → HTTP → recomendaciones](docs/automatic-courses.md).
+La ejecución periódica requiere activación explícita; no usa el usuario HTTP ni el staging.
+
 Importación administrativa **solo local**, con dry-run predeterminado y revisión
 de conflictos: [catálogo de cursos y habilidades](docs/catalog-import.md).
 No es una funcionalidad HTTP desplegada ni habilita cargas a Azure.
