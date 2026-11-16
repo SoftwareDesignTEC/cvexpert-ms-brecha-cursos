@@ -4,6 +4,7 @@
   "description": "Microservicio de brecha de habilidades y recomendación de cursos de CVExpert",
   "main": "index.js",
   "scripts": {
+    "courses:ingest:once": "node dist/ingestion/cli.js",
     "test": "node --import tsx --test test/*.test.ts",
     "courses:discover": "tsx scripts/discover-courses.ts",
     "db:migrate": "tsx src/db/cli.ts migrate",

@@ -1,0 +1,129 @@
+{
+  "kind": "MINIMAL_REAL_METADATA_SNAPSHOT_NOT_LIVE",
+  "checkedAt": "2026-11-16T20:38:28.460Z",
+  "attribution": "The Open University (RDF metadata CC BY 3.0); freeCodeCamp (client metadata BSD-3-Clause; see docs/licenses/freecodecamp-BSD-3-Clause.txt). Selected introductions only, no lessons.",
+  "openlearn": {
+    "head": {
+      "vars": [
+        "resource",
+        "title",
+        "url",
+        "description"
+      ]
+    },
+    "results": {
+      "bindings": [
+        {
+          "resource": {
+            "type": "uri",
+            "value": "http://data.open.ac.uk/openlearn/science-maths-technology/computing-and-ict/introduction-information-security/content-section-0"
+          },
+          "title": {
+            "type": "literal",
+            "value": "An introduction to information security"
+          },
+          "url": {
+            "type": "uri",
+            "value": "http://www.open.edu/openlearn/science-maths-technology/computing-and-ict/introduction-information-security/content-section-0"
+          },
+          "description": {
+            "type": "literal",
+            "value": "Headline news scares about stolen or missing data are becoming a frequent occurrence. This free course, An introduction to information security, discusses the importance of protecting information. Organisations are relying more and more heavily on computers to store sensitive corporate and customer information and this OpenLearn course gives an overview of information security management systems."
+          }
+        },
+        {
+          "resource": {
+            "type": "uri",
+            "value": "http://data.open.ac.uk/openlearn/science-maths-technology/computing-and-ict/systems-computer/network-security/content-section-0"
+          },
+          "title": {
+            "type": "literal",
+            "value": "Network security"
+          },
+          "url": {
+            "type": "uri",
+            "value": "http://www.open.edu/openlearn/science-maths-technology/computing-and-ict/systems-computer/network-security/content-section-0"
+          },
+          "description": {
+            "type": "literal",
+            "value": "Encryption of files and firewalls are just some of the security measures that can be used in security. This free course, Network security, which assumes you have a substantial knowledge of computing, helps to explain the intricacies of the continually changing area of network security by studying the main issues involved in achieving a reasonable degree of resilience against attacks."
+          }
+        },
+        {
+          "resource": {
+            "type": "uri",
+            "value": "http://data.open.ac.uk/openlearn/science-maths-technology/information-security/content-section-0"
+          },
+          "title": {
+            "type": "literal",
+            "value": "Information security"
+          },
+          "url": {
+            "type": "uri",
+            "value": "http://www.open.edu/openlearn/science-maths-technology/information-security/content-section-0"
+          },
+          "description": {
+            "type": "literal",
+            "value": "Information security underpins the commercial viability and profitability of enterprises of all sizes and the effectiveness of public sector organisations. This free course begins by explaining why information security and its management are important for any modern organisation and to every individual. You need to be familiar with an organisation, such as your employer, to study this course."
+          }
+        }
+      ]
+    },
+    "meta": {
+      "query-time-ms": 555,
+      "result-size-total": 3
+    }
+  },
+  "ref": {
+    "ref": "refs/heads/main",
+    "node_id": "MDM6UmVmMjg0NTc4MjM6cmVmcy9oZWFkcy9tYWlu",
+    "url": "https://api.github.com/repos/freeCodeCamp/freeCodeCamp/git/refs/heads/main",
+    "object": {
+      "sha": "1a993965c8be5315cc8ec85023124cc075f896b1",
+      "type": "commit",
+      "url": "https://api.github.com/repos/freeCodeCamp/freeCodeCamp/git/commits/1a993965c8be5315cc8ec85023124cc075f896b1"
+    }
+  },
+  "readme": "freeCodeCamp.org offers several free developer certifications that make up the Full-Stack Developer Curriculum:\n- [Python Certification](https://www.freecodecamp.org/learn/python-v9/)\n- [JavaScript Certification](https://www.freecodecamp.org/learn/javascript-v9/)\n- [Relational Databases Certification](https://www.freecodecamp.org/learn/relational-databases-v9/)\n- [Responsive Web Design Certification](https://www.freecodecamp.org/learn/responsive-web-design-v9/)",
+  "intro": {
+    "python-v9": {
+      "title": "Python Certification",
+      "intro": [
+        "This course teaches you the fundamentals of Python programming."
+      ],
+      "blocks": {}
+    },
+    "javascript-v9": {
+      "title": "JavaScript Certification",
+      "intro": [
+        "This course teaches you core JavaScript programming concepts such as working with variables, functions, objects, arrays, and control flow. You'll also learn how to manipulate the DOM, handle events, and apply techniques like asynchronous programming, functional programming, and accessibility best practices."
+      ],
+      "blocks": {}
+    },
+    "relational-databases-v9": {
+      "title": "Relational Databases Certification",
+      "intro": [
+        "This course teaches you the fundamentals of relational databases."
+      ],
+      "blocks": {
+        "lecture-working-with-sql": {
+          "intro": [
+            "In these lessons, you will learn about SQL injection, normalization, and the N+1 problem."
+          ]
+        },
+        "lecture-introduction-to-git-and-github": {
+          "intro": [
+            "Learn how to work with Git and GitHub in these lessons."
+          ]
+        }
+      }
+    },
+    "responsive-web-design-v9": {
+      "title": "Responsive Web Design Certification",
+      "intro": [
+        "This course teaches the fundamentals of HTML and CSS, including modern layout, design, accessibility, and responsive web development. You'll build practical projects and gain the skills to create professional, user-friendly webpages."
+      ],
+      "blocks": {}
+    }
+  }
+}

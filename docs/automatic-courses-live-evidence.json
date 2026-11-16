@@ -1,0 +1,331 @@
+{
+  "formatVersion": 1,
+  "kind": "LIVE_TWO_PROVIDER_DISPOSABLE_DEMONSTRATION",
+  "baseCommit": "cb9915e",
+  "synchronizedAt": "2026-11-16T20:48:49.964Z",
+  "database": "PostgreSQL 17 UUID disposable, removed by withTestDatabase after verification",
+  "operationalAzureUpdated": false,
+  "authorization": "User-requested automatic metadata ingestion; no human editorial approval claimed",
+  "requestBudgetPerExecution": 4,
+  "liveExecutionsInFinalDemonstration": 2,
+  "firstRequests": [
+    {
+      "url": "https://data.open.ac.uk/sparql",
+      "at": "2026-11-16T20:48:52.031Z",
+      "status": 200,
+      "bytes": 2539,
+      "responseSha256": "7e0f748eddc586ce2e198c05e736ae94d9fc67ab10613690df15cd73d2c36ca1",
+      "querySha256": "43cf6798dac7677b5ecea8d3cfa40fa357d7b74c4ca6a77d7559ad5dd4f26fea"
+    },
+    {
+      "url": "https://api.github.com/repos/freeCodeCamp/freeCodeCamp/git/ref/heads/main",
+      "at": "2026-11-16T20:48:52.653Z",
+      "status": 200,
+      "bytes": 353,
+      "responseSha256": "052dcc1a26ebb3dc73766b97abe682c54e8b69c51945318bc0f4c6aa90f2ba72"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/freeCodeCamp/freeCodeCamp/1a993965c8be5315cc8ec85023124cc075f896b1/README.md",
+      "at": "2026-11-16T20:48:53.241Z",
+      "status": 200,
+      "bytes": 7205,
+      "responseSha256": "230c15828f0d9a2be79235a4b47361c7594218127bf2f97686f571a0cef0e5eb"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/freeCodeCamp/freeCodeCamp/1a993965c8be5315cc8ec85023124cc075f896b1/client/i18n/locales/english/intro.json",
+      "at": "2026-11-16T20:48:53.729Z",
+      "status": 200,
+      "bytes": 564632,
+      "responseSha256": "0611b89c893bbbc93108cc90418c621fba42286711f8c30de9813e775a665451"
+    }
+  ],
+  "sources": [
+    {
+      "provider": "openlearn",
+      "found": 3,
+      "inserted": 2,
+      "existing": 0,
+      "associations": 2,
+      "rejected": [
+        {
+          "url": "http://www.open.edu/openlearn/science-maths-technology/computing-and-ict/introduction-information-security/content-section-0",
+          "reason": "OFFICIAL_HTTPS_ROUTE_NOT_VERIFIED"
+        }
+      ]
+    },
+    {
+      "provider": "freecodecamp",
+      "found": 4,
+      "inserted": 4,
+      "existing": 0,
+      "associations": 6,
+      "rejected": []
+    }
+  ],
+  "courses": [
+    {
+      "title": "Network security",
+      "platform": "OpenLearn — The Open University",
+      "url": "https://www.open.edu/openlearn/digital-computing/network-security/content-section-0",
+      "is_paid": false,
+      "duration_hours": null,
+      "skills": [
+        "Ciberseguridad"
+      ]
+    },
+    {
+      "title": "Information security",
+      "platform": "OpenLearn — The Open University",
+      "url": "https://www.open.edu/openlearn/science-maths-technology/information-security/content-section-0",
+      "is_paid": false,
+      "duration_hours": null,
+      "skills": [
+        "Ciberseguridad"
+      ]
+    },
+    {
+      "title": "Python Certification",
+      "platform": "freeCodeCamp",
+      "url": "https://www.freecodecamp.org/learn/python-v9/",
+      "is_paid": false,
+      "duration_hours": null,
+      "skills": [
+        "Python"
+      ]
+    },
+    {
+      "title": "JavaScript Certification",
+      "platform": "freeCodeCamp",
+      "url": "https://www.freecodecamp.org/learn/javascript-v9/",
+      "is_paid": false,
+      "duration_hours": null,
+      "skills": [
+        "JavaScript"
+      ]
+    },
+    {
+      "title": "Relational Databases Certification",
+      "platform": "freeCodeCamp",
+      "url": "https://www.freecodecamp.org/learn/relational-databases-v9/",
+      "is_paid": false,
+      "duration_hours": null,
+      "skills": [
+        "Git",
+        "SQL"
+      ]
+    },
+    {
+      "title": "Responsive Web Design Certification",
+      "platform": "freeCodeCamp",
+      "url": "https://www.freecodecamp.org/learn/responsive-web-design-v9/",
+      "is_paid": false,
+      "duration_hours": null,
+      "skills": [
+        "CSS",
+        "HTML"
+      ]
+    }
+  ],
+  "secondCommand": "npm run courses:ingest:once (node dist/ingestion/cli.js)",
+  "secondStatus": "complete",
+  "secondResults": [
+    {
+      "provider": "openlearn",
+      "found": 3,
+      "inserted": 0,
+      "existing": 2,
+      "associations": 0,
+      "rejected": [
+        {
+          "url": "http://www.open.edu/openlearn/science-maths-technology/computing-and-ict/introduction-information-security/content-section-0",
+          "reason": "OFFICIAL_HTTPS_ROUTE_NOT_VERIFIED"
+        }
+      ]
+    },
+    {
+      "provider": "freecodecamp",
+      "found": 4,
+      "inserted": 0,
+      "existing": 4,
+      "associations": 0,
+      "rejected": []
+    }
+  ],
+  "physicalCounts": {
+    "courses": "7",
+    "links": "9"
+  },
+  "preexistingSyntheticManualFixture": {
+    "courses": 1,
+    "associations": 1,
+    "preserved": true,
+    "scope": "TEST disposable only"
+  },
+  "coursesHttp": {
+    "request": "GET /courses",
+    "status": 200,
+    "response": {
+      "items": [
+        {
+          "id": "1",
+          "title": "[TEST] Preexisting manual",
+          "url": "https://example.org/TEST/manual",
+          "platform": "TEST",
+          "logoUrl": null,
+          "durationHours": null,
+          "isPaid": false,
+          "skills": [
+            "SQL"
+          ]
+        },
+        {
+          "id": "2",
+          "title": "Network security",
+          "url": "https://www.open.edu/openlearn/digital-computing/network-security/content-section-0",
+          "platform": "OpenLearn — The Open University",
+          "logoUrl": null,
+          "durationHours": null,
+          "isPaid": false,
+          "skills": [
+            "Ciberseguridad"
+          ]
+        },
+        {
+          "id": "3",
+          "title": "Information security",
+          "url": "https://www.open.edu/openlearn/science-maths-technology/information-security/content-section-0",
+          "platform": "OpenLearn — The Open University",
+          "logoUrl": null,
+          "durationHours": null,
+          "isPaid": false,
+          "skills": [
+            "Ciberseguridad"
+          ]
+        },
+        {
+          "id": "4",
+          "title": "Python Certification",
+          "url": "https://www.freecodecamp.org/learn/python-v9/",
+          "platform": "freeCodeCamp",
+          "logoUrl": null,
+          "durationHours": null,
+          "isPaid": false,
+          "skills": [
+            "Python"
+          ]
+        },
+        {
+          "id": "5",
+          "title": "JavaScript Certification",
+          "url": "https://www.freecodecamp.org/learn/javascript-v9/",
+          "platform": "freeCodeCamp",
+          "logoUrl": null,
+          "durationHours": null,
+          "isPaid": false,
+          "skills": [
+            "JavaScript"
+          ]
+        },
+        {
+          "id": "6",
+          "title": "Relational Databases Certification",
+          "url": "https://www.freecodecamp.org/learn/relational-databases-v9/",
+          "platform": "freeCodeCamp",
+          "logoUrl": null,
+          "durationHours": null,
+          "isPaid": false,
+          "skills": [
+            "Git",
+            "SQL"
+          ]
+        },
+        {
+          "id": "7",
+          "title": "Responsive Web Design Certification",
+          "url": "https://www.freecodecamp.org/learn/responsive-web-design-v9/",
+          "platform": "freeCodeCamp",
+          "logoUrl": null,
+          "durationHours": null,
+          "isPaid": false,
+          "skills": [
+            "CSS",
+            "HTML"
+          ]
+        }
+      ],
+      "page": 1,
+      "pageSize": 20,
+      "totalRecords": 7
+    }
+  },
+  "recommendationsHttp": {
+    "request": "POST /skills-gap/recommendations",
+    "status": 200,
+    "input": {
+      "cv": {
+        "id": "TEST-cv",
+        "skills": []
+      },
+      "jobs": [
+        {
+          "id": "TEST-job",
+          "skills": [
+            "Python"
+          ]
+        }
+      ]
+    },
+    "response": {
+      "cvId": "TEST-cv",
+      "dataSource": "client_request",
+      "results": [
+        {
+          "jobId": "TEST-job",
+          "status": "partial",
+          "requiredSkillsCount": 1,
+          "documentedMatchesCount": 0,
+          "documentedCoveragePercent": 0,
+          "matchedSkills": [],
+          "notDocumentedSkills": [
+            "Python"
+          ],
+          "recommendations": [
+            {
+              "skillName": "Python",
+              "catalogMatch": "matched",
+              "courses": [
+                {
+                  "id": "4",
+                  "title": "Python Certification",
+                  "platform": "freeCodeCamp",
+                  "url": "https://www.freecodecamp.org/learn/python-v9/",
+                  "logoUrl": null,
+                  "durationHours": null,
+                  "isPaid": false,
+                  "skills": [
+                    "Python"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "catalogStatus": "consulted"
+    }
+  },
+  "attribution": {
+    "openlearn": {
+      "creator": "The Open University",
+      "source": "https://data.open.ac.uk/datasets#openlearn",
+      "license": "https://creativecommons.org/licenses/by/3.0/",
+      "changes": "Selected validated metadata, explicit verified canonical URL aliases, skill associations by declared policy. No endorsement."
+    },
+    "freecodecamp": {
+      "creator": "freeCodeCamp",
+      "source": "https://github.com/freeCodeCamp/freeCodeCamp",
+      "license": "BSD-3-Clause for client software/metadata; see docs/licenses/freecodecamp-BSD-3-Clause.txt",
+      "changes": "Selected titles, links and metadata field references. No lessons copied. No endorsement."
+    }
+  }
+}
