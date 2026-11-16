@@ -23,6 +23,8 @@
     "courses:sync": "tsx scripts/sync-courses.ts",
     "courses:sync:local": "tsx scripts/sync-courses-local.ts",
     "courses:openlearn:staging": "tsx scripts/integrate-openlearn-local.ts",
+    "courses:official:review": "tsx scripts/review-official-courses.ts",
+    "courses:real:demo": "node --import tsx --test test/db/real-courses.test.ts",
     "courses:openlearn:probe": "tsx scripts/probe-openlearn.ts"
   },
   "repository": {
