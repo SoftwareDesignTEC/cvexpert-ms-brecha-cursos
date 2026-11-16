@@ -90,15 +90,29 @@ function retainKnown(previous: SyncCandidate, incoming: SyncCandidate): SyncCand
     });
     return c;
 }
-function editorialConflict(verified: SyncCandidate, c: SyncCandidate): boolean {
-    // A verified document protects every known field; unknown editorial fields grant no approval.
-    for (const key of ['title','platform','canonicalUrl','language','durationMinutes','isPaid','modality','geography',
-        'availability','associatedSkills','offerings','price'] as const) {
-        const v = verified[key];
-        if (v != null && v !== 'unknown' && (!Array.isArray(v) || v.length > 0)
-            && canonical(v) !== canonical(c[key])) return true;
+function changedContradiction(previous: unknown, incoming: unknown, verified: unknown): boolean {
+    const known = (v: unknown) => v != null && v !== 'unknown' && (!Array.isArray(v) || v.length > 0);
+    if (!known(incoming) || !known(verified)) return false;
+    if (typeof incoming === 'object' && !Array.isArray(incoming)
+        && typeof verified === 'object' && !Array.isArray(verified)) {
+        const before = previous as Record<string,unknown> | null | undefined;
+        const reviewed = verified as Record<string,unknown>;
+        return Object.entries(incoming as Record<string,unknown>)
+            .some(([key,value]) => changedContradiction(before?.[key],value,reviewed[key]));
     }
-    return false;
+    return canonical(previous) !== canonical(incoming) && canonical(verified) !== canonical(incoming);
+}
+function editorialConflict(verified: SyncCandidate, previous: SyncCandidate, incoming: SyncCandidate): boolean {
+    // Compare source deltas before retainKnown: editorial enrichment and unchanged
+    // source values are not contradictions. Unknown leaves never assert a change.
+    for (const key of ['title','platform','canonicalUrl','language','durationMinutes','isPaid','modality','geography',
+        'availability','associatedSkills','price'] as const) {
+        if (changedContradiction(previous[key],incoming[key],verified[key])) return true;
+    }
+    // Missing offerings are not removals; compare explicit fields by stable offering ID.
+    return incoming.offerings.some(o => changedContradiction(
+        previous.offerings.find(p => p.externalId === o.externalId),o,
+        verified.offerings.find(v => v.externalId === o.externalId)));
 }
 function validateRun(run: SyncRun) {
     text(run.runId); text(run.sourceId); timestamp(run.observedAt);
@@ -150,12 +164,12 @@ export function createPostgresStaging(pool: Pool): CourseSyncStaging {
                         if (!old || next.origin === 'manual' || next.course.sourceId !== run.sourceId || plan.skipped) continue;
                         const seen = accepted.has(identity(next.course));
                         if (!seen && old.missing_count === next.missingCount) continue;
-                        next.course = retainKnown(old.observed,next.course);
                         if (Object.hasOwn(expectedVersions,old.candidate_id) && expectedVersions[old.candidate_id] !== old.version) {
                             conflicts.set(old.candidate_id,'VERSION_CONFLICT');
-                        } else if (old.verified && editorialConflict(old.verified,next.course)) {
+                        } else if (seen && old.verified && editorialConflict(old.verified,old.observed,next.course)) {
                             conflicts.set(old.candidate_id,'EDITORIAL_CONFLICT');
                         }
+                        next.course = retainKnown(old.observed,next.course);
                     }
                     if (conflicts.size) {
                         result.absenceEligible = false;

@@ -55,7 +55,20 @@ del dato observado en el último recorrido. Campos ausentes del contrato obligat
 invalidan el registro y tampoco borran información.
 
 `verified` es un documento completo, no una aprobación automática de `observed`.
-Sus valores conocidos se protegen contra propuestas divergentes. Un conflicto conserva
+El conflicto editorial compara tres valores: el último conocimiento observado de la
+fuente, la nueva observación explícita y el valor verificado. Solo hay contradicción
+cuando la fuente aporta un valor conocido diferente del anterior y del editorial.
+Una repetición sin cambios no contradice un título de presentación editorial distinto;
+habilidades vacías, duración `null` y otros valores desconocidos tampoco contradicen
+enriquecimientos editoriales. Si un campo antes desconocido pasa a tener un valor
+explícito que contradice la revisión, se exige revisión como nueva información discrepante.
+Si el cambio coincide con lo verificado, se acepta como observación sin alterar la revisión.
+Las ubicaciones y precios se comparan por campo informado, y las convocatorias por
+ID estable y campo; omisiones y valores desconocidos no se interpretan como retiradas.
+La detección ocurre antes de `retainKnown`, que conserva únicamente conocimiento de
+la fuente y nunca copia enriquecimiento editorial a `observed`.
+
+Un conflicto conserva
 el candidato completo, guarda la observación y registra `EDITORIAL_CONFLICT` o
 `VERSION_CONFLICT` en el resultado durable. La ingesta no cambia `review_state`; el
 editor consulta los resultados de `runs` para resolver conflictos y cambiar ese estado.
@@ -102,8 +115,9 @@ No se crean índices GIN: las consultas operativas usan las claves relacionales.
 3. Resuelve replay por `(source_id,run_id)` y hash canónico de entrada + versiones esperadas.
 4. Exige proveedor autorizado; lee staging con `FOR UPDATE` y los checkpoints.
 5. Ejecuta el `reconcile` existente sobre ese snapshot, nunca sobre tablas públicas.
-6. Conserva campos conocidos después de detectar duplicados/conflictos en la entrada
-   original. Comprueba versiones esperadas y valores editoriales; no elige un ganador.
+6. Detecta cambios explícitos contradictorios comparando la fuente anterior/nueva con
+   lo editorial, después de conciliar duplicados/colisiones y antes de conservar campos
+   desconocidos con `retainKnown`. Comprueba versiones esperadas; no elige un ganador.
 7. Guarda únicamente propuestas aceptables, observaciones válidas, recibo y checkpoint
    en la misma transacción; confirma COMMIT.
 
@@ -198,3 +212,20 @@ cobertura incompleta, tres ausencias, JSON inválido y DML de catálogo denegado
 También se ejecuta la suite administrativa previa con TLS verificado y el flujo CLI
 plan/sign/apply/verify; los datos públicos que esa suite escribe son fixtures sintéticos
 dentro de sus bases UUID desechables. No se toca ningún catálogo operativo.
+
+Las regresiones editoriales A–E cubren habilidades enriquecidas, duración verificada
+desconocida por la fuente, título editorial diferente y cambios explícitos realmente
+contradictorios (habilidades, duración y título). Verifican revisión/revisor/fecha intactos,
+identidad y versión, replay sin DML, observación original y recibo/checkpoint coherentes.
+También prueban campos anidados desconocidos, edición concurrente con espera real del
+lock de fila y `VERSION_CONFLICT`, y rollback completo al fallar el checkpoint de una
+ejecución con enriquecimiento editorial.
+
+Validación de la corrección: `npm run build` aprobado, `npm test` **149/149**,
+`npm run db:test` **103/103** (suite de staging **24/24**) con PostgreSQL 17
+desechable y TLS para los controles administrativos existentes, y `git diff --check`
+sin errores. Ninguna prueba DB omitida. Las regresiones A–C fallan con la implementación
+anterior y pasan con la corrección. Para la comparación documental previa de Windows
+se normalizó temporalmente a LF `docs/job-required-skill-levels.md`, sin modificar sus
+assertions ni su contenido; se restauró al terminar. No se cambian contrato público,
+esquema ni permisos.

@@ -3,12 +3,14 @@ import { readFile, mkdtemp, writeFile, unlink, rmdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { setTimeout } from 'node:timers/promises';
 import { test } from 'node:test';
 import { Pool } from 'pg';
 import { migrate } from '../../src/db/migrate.js';
 import { getDatabaseConfig } from '../../src/db/config.js';
 import { withTestDatabase } from './helpers/test-database.js';
 import { createPostgresStaging, disposableMarker } from '../../scripts/course-sync/postgres.js';
+import type { StagingResult } from '../../scripts/course-sync/persistence.js';
 import { testCandidate, testRun } from '../fixtures/course-sync.test.js';
 import type { SyncCandidate, SyncRun } from '../../scripts/course-sync/model.js';
 import { runLocalSync } from '../../scripts/sync-courses-local.js';
@@ -134,6 +136,133 @@ test('Course Sync staging real PostgreSQL 17: transacciones, permisos y recupera
             const unsafe = await store.execute(run({}, { title: '[TEST] Conflicto con otra fila ausente' }));
             assert.equal(unsafe.absenceEligible,false);
             assert.equal((await owner.query("SELECT missing_count FROM course_sync.candidates WHERE external_id='TEST-second'")).rows[0].missing_count,0);
+        });
+        for (const scenario of [
+            { name: 'A: habilidades enriquecidas', source: { associatedSkills: [] }, editorial: { associatedSkills: ['SQL'] } },
+            { name: 'B: duración editorial desconocida por la fuente', source: { durationMinutes: null }, editorial: { durationMinutes: 120 } },
+            { name: 'C: título de presentación editorial', source: {}, editorial: { title: '[TEST] Título de presentación editorial' } },
+        ]) await t.test(`${scenario.name}: observación idéntica no contradice la revisión`, async () => {
+            await reset();
+            await store.execute(run({},scenario.source));
+            const original = await row();
+            const document = { ...original.observed,...scenario.editorial };
+            await editor.query(`UPDATE course_sync.candidates SET verified=$1,verified_by='TEST-editor',
+                verified_at=clock_timestamp(),review_state='verified' WHERE candidate_id=$2 AND version=$3`,
+            [JSON.stringify(document),original.candidate_id,original.version]);
+            const reviewed = await row();
+            const input = run({},scenario.source);
+            const result = await store.execute(input);
+            assert.equal(result.actions.some(a => a.reason === 'EDITORIAL_CONFLICT'),false);
+            assert.equal(result.absenceEligible,true);
+            const current = await row();
+            assert.equal(current.candidate_id,original.candidate_id);
+            assert.equal(current.version,reviewed.version + 1);
+            assert.deepEqual(current.verified,reviewed.verified);
+            assert.equal(current.verified_by,reviewed.verified_by);
+            assert.deepEqual(current.verified_at,reviewed.verified_at);
+            assert.equal(current.review_state,'verified');
+            assert.deepEqual(current.observed,input.candidates[0]);
+            const observation = (await owner.query('SELECT document FROM course_sync.observations WHERE run_id=$1',[input.runId])).rows[0];
+            assert.deepEqual(observation.document,input.candidates[0]);
+            const checkpoint = (await owner.query(`SELECT c.run_id,r.result FROM course_sync.checkpoints c
+                JOIN course_sync.runs r USING(source_id,run_id)`)).rows[0];
+            assert.equal(checkpoint.run_id,input.runId);
+            assert.deepEqual(checkpoint.result,result);
+            assert.deepEqual(await store.execute(input),{ ...result,replay: true });
+            assert.deepEqual(await row(),current);
+        });
+        await t.test('D: cambios explícitos conocidos que contradicen revisión conservan conflicto', async () => {
+            for (const scenario of [
+                { before: { durationMinutes: 60 }, verified: { durationMinutes: 120 }, incoming: { durationMinutes: 90 } },
+                { before: { associatedSkills: ['SQL'] }, verified: { associatedSkills: ['SQL'] }, incoming: { associatedSkills: ['Python'] } },
+                { before: {}, verified: { title: '[TEST] Título editorial' }, incoming: { title: '[TEST] Nuevo título de fuente' } },
+            ]) {
+                await reset(); await store.execute(run({},scenario.before));
+                const original = await row();
+                await editor.query(`UPDATE course_sync.candidates SET verified=$1,verified_by='TEST-editor',
+                    verified_at=clock_timestamp(),review_state='verified' WHERE candidate_id=$2`,
+                [JSON.stringify({ ...original.observed,...scenario.verified }),original.candidate_id]);
+                const reviewed = await row();
+                const input = run({},scenario.incoming);
+                const result = await store.execute(input);
+                assert.ok(result.actions.some(a => a.reason === 'EDITORIAL_CONFLICT'));
+                assert.equal(result.absenceEligible,false);
+                assert.deepEqual(await row(),reviewed);
+                assert.deepEqual((await owner.query('SELECT document FROM course_sync.observations WHERE run_id=$1',[input.runId])).rows[0].document,input.candidates[0]);
+                const agreeing = await store.execute(run({},scenario.verified));
+                assert.equal(agreeing.actions.some(a => a.reason === 'EDITORIAL_CONFLICT'),false);
+                assert.deepEqual((await row()).verified,reviewed.verified);
+            }
+        });
+        await t.test('desconocidos nuevos y campos anidados no contradicen enriquecimiento ni borran observaciones', async () => {
+            await reset();
+            const geography = { country: 'CR',region: 'TEST-source',locality: null };
+            const offering = { externalId: 'TEST-editorial-call',availability: 'available' as const,
+                startsAt: '2027-01-01T00:00:00.000Z',endsAt: null,modality: 'virtual' as const,geography };
+            await store.execute(run({}, { durationMinutes: 60,associatedSkills: ['SQL'],geography,offerings: [offering] }));
+            const original = await row();
+            const verified = { ...original.observed,durationMinutes: 120,associatedSkills: ['SQL','Python'],
+                geography: { ...geography,region: 'TEST-editor' },offerings: [{ ...offering,startsAt: '2027-01-02T00:00:00.000Z' }] };
+            await editor.query(`UPDATE course_sync.candidates SET verified=$1,verified_by='TEST-editor',verified_at=clock_timestamp(),
+                review_state='verified' WHERE candidate_id=$2`,[JSON.stringify(verified),original.candidate_id]);
+            const input = run({}, { durationMinutes: null,associatedSkills: [],geography: { country: 'CR',region: null,locality: null },
+                offerings: [{ ...offering,startsAt: null }] });
+            const result = await store.execute(input);
+            assert.equal(result.actions.some(a => a.reason === 'EDITORIAL_CONFLICT'),false);
+            const current = await row();
+            assert.deepEqual(current.verified,verified);
+            assert.equal(current.observed.durationMinutes,60);
+            assert.deepEqual(current.observed.associatedSkills,['SQL']);
+            assert.deepEqual(current.observed.geography,geography);
+            assert.deepEqual(current.observed.offerings,[offering]);
+        });
+        await t.test('E: enriquecimiento no evita control de versión ni rollback atómico del checkpoint', async () => {
+            await reset(); await store.execute(run({}, { associatedSkills: [],durationMinutes: null }));
+            const original = await row();
+            const editing = await editor.connect();
+            let pending: Promise<PromiseSettledResult<StagingResult>[]> | undefined;
+            try {
+                await editing.query('BEGIN');
+                await editing.query(`UPDATE course_sync.candidates SET verified=jsonb_set(observed,'{durationMinutes}','120'),
+                    verified_by='TEST-editor',verified_at=clock_timestamp(),review_state='verified' WHERE candidate_id=$1`,[original.candidate_id]);
+                pending = Promise.allSettled([store.execute(run({}, { associatedSkills: [],durationMinutes: null }),
+                    { [original.candidate_id]: original.version })]);
+                const deadline = Date.now() + 3000;
+                let waiting = false;
+                do {
+                    waiting = (await owner.query(`SELECT EXISTS (SELECT 1 FROM pg_locks l
+                        JOIN pg_stat_activity a ON a.pid=l.pid WHERE a.datname=current_database()
+                        AND NOT l.granted AND l.locktype IN ('transactionid','tuple')) AS waiting`)).rows[0].waiting;
+                    if (waiting) break;
+                    await setTimeout(20);
+                } while (Date.now() < deadline);
+                assert.equal(waiting,true,'ingesta espera la edición concurrente antes de leer la versión');
+                await editing.query('COMMIT');
+            } finally { await editing.query('ROLLBACK'); editing.release(); if (pending) await pending; }
+            const reviewed = await row();
+            const [outcome] = await pending!;
+            if (outcome!.status === 'rejected') throw outcome!.reason;
+            const stale = outcome!.value;
+            assert.ok(stale.actions.some(a => a.reason === 'VERSION_CONFLICT'));
+            assert.equal(stale.actions.some(a => a.reason === 'EDITORIAL_CONFLICT'),false);
+            assert.deepEqual(await row(),reviewed);
+            const before = (await owner.query(`SELECT (SELECT count(*) FROM course_sync.observations) AS observations,
+                (SELECT count(*) FROM course_sync.runs) AS runs,(SELECT jsonb_agg(c) FROM course_sync.checkpoints c) AS checkpoints`)).rows;
+            const input = run({}, { associatedSkills: [],durationMinutes: null });
+            await owner.query(`CREATE FUNCTION course_sync.test_editorial_checkpoint() RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN RAISE EXCEPTION 'TEST_EDITORIAL_CHECKPOINT'; END $$;
+                CREATE TRIGGER test_editorial_checkpoint BEFORE UPDATE ON course_sync.checkpoints
+                FOR EACH ROW EXECUTE FUNCTION course_sync.test_editorial_checkpoint()`);
+            try {
+                await assert.rejects(store.execute(input),/TEST_EDITORIAL_CHECKPOINT/);
+                assert.deepEqual(await row(),reviewed);
+                const after = (await owner.query(`SELECT (SELECT count(*) FROM course_sync.observations) AS observations,
+                    (SELECT count(*) FROM course_sync.runs) AS runs,(SELECT jsonb_agg(c) FROM course_sync.checkpoints c) AS checkpoints`)).rows;
+                assert.deepEqual(after,before);
+            } finally { await owner.query('DROP TRIGGER test_editorial_checkpoint ON course_sync.checkpoints; DROP FUNCTION course_sync.test_editorial_checkpoint()'); }
+            const recovered = await store.execute(input);
+            assert.equal(recovered.actions.some(a => a.reason === 'EDITORIAL_CONFLICT'),false);
+            assert.equal((await store.execute(input)).replay,true);
         });
         await t.test('registros manuales protegidos y cursos públicos nunca se adoptan', async () => {
             await reset(); await store.execute(run());
