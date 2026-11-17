@@ -1,647 +1,309 @@
-# cvexpert-ms-brecha-cursos
-Microservicio de brecha de habilidades y recomendación de cursos de CVExpert
 
-Importación administrativa **solo local**, con dry-run predeterminado y revisión
-de conflictos: [catálogo de cursos y habilidades](docs/catalog-import.md).
-No es una funcionalidad HTTP desplegada ni habilita cargas a Azure.
+# CVExpert — Microservicio de Brecha de Habilidades y Cursos
 
-Descubrimiento formativo separado del catálogo: [proveedor Microsoft Learn v1,
-propuestas locales y revisión](docs/course-discovery.md). Ejecutar sin credenciales
-`npm run courses:discover -- --dry-run --fixture`. No consulta PostgreSQL ni publica
-cursos; el modo real y la programación permanecen desactivados por defecto.
+Microservicio de CVExpert encargado de comparar las habilidades documentadas en un currículum con los requisitos de ofertas laborales o de un contexto de mercado, identificar brechas y consultar formación relacionada con esas habilidades.
+
+La API está desarrollada con **Node.js 24, TypeScript y Express 5**. Utiliza **PostgreSQL** para almacenar el catálogo de cursos, sus relaciones con habilidades, los requisitos de mercado y las instantáneas de habilidades de usuarios.
+
+## Funcionalidades
+
+- **Análisis por oferta:** compara las habilidades de un CV con las solicitadas por una o varias ofertas laborales.
+- **Evaluación de niveles:** identifica niveles requeridos cuando están expresados explícitamente en la descripción o los requisitos de una oferta; informa los casos desconocidos o ambiguos sin inventar equivalencias.
+- **Recomendación de cursos:** consulta cursos asociados en el catálogo a habilidades requeridas que no están documentadas en el CV.
+- **Catálogo de formación:** lista cursos con paginación y filtros de plataforma, habilidad y modalidad de pago.
+- **Brecha frente al mercado:** compara una instantánea de habilidades del usuario con requisitos de mercado previamente cargados y asociados a un contexto configurado.
+
+El análisis distingue entre **cobertura documental** y **nivel de competencia**. Por ejemplo, que una habilidad aparezca en el CV no significa que alcance el nivel exigido; y que no aparezca no demuestra que la persona carezca de ella.
+
+## Tecnologías
+
+| Componente | Tecnología |
+| --- | --- |
+| Runtime | Node.js 24 |
+| Lenguaje | TypeScript |
+| API HTTP | Express 5 |
+| Base de datos | PostgreSQL (versión 17 en Docker local y CI) |
+| Acceso a PostgreSQL | `pg`, con consultas SQL parametrizadas |
+| Documentación de API | OpenAPI 3.0 y Swagger UI |
+| Pruebas | Node.js Test Runner y `tsx` |
+| Integración y despliegue | GitHub Actions y Azure App Service |
+
+## Arquitectura
+
+El servicio separa la exposición HTTP de la lógica de negocio y de la persistencia:
+
+```text
+Web / Android
+     |
+     | HTTPS + token de Google
+     v
+Azure API Management
+     |  Valida el token y agrega X-User-Id
+     |  Presenta un certificado de cliente
+     v
+Express: middleware y rutas
+     |
+     v
+Controladores HTTP
+     |
+     v
+Servicios y dominio
+     |
+     +------------------------------+
+     |                              |
+     | Evaluación contextual        | Operaciones con catálogo,
+     | sin acceso a base de datos   | mercado o instantáneas
+     |                              v
+     |                        Repositorios SQL
+     |                              |
+     |                              v
+     |                          PostgreSQL
+     v
+Respuesta JSON a través de APIM
+```
+
+Las responsabilidades principales se distribuyen así:
+
+| Directorio | Responsabilidad |
+| --- | --- |
+| `src/routes/` | Registro de operaciones HTTP. |
+| `src/controllers/` | Validación de solicitudes, códigos de respuesta y traducción de errores. |
+| `src/services/` | Coordinación de los casos de uso y las consultas necesarias. |
+| `src/domain/` | Normalización de habilidades, comparación ordinal y reglas de análisis independientes de Express. |
+| `src/repositories/` | Persistencia y consultas parametrizadas a PostgreSQL. |
+| `src/security/` | Verificación del certificado cliente de APIM. |
+| `src/db/` y `db/migrations/` | Configuración de PostgreSQL, migraciones y mantenimiento del esquema. |
+| `scripts/` | Importación administrativa y descubrimiento controlado de cursos, separados del servidor HTTP. |
+| `test/` | Pruebas HTTP, del dominio, seguridad e integración con bases desechables. |
+
+**No se realizan solicitudes HTTP directas a otros microservicios de CVExpert.** Los clientes consultan CVs y Ofertas mediante APIM y envían al análisis únicamente las proyecciones necesarias de esos recursos.
+
+## API HTTP
+
+El contrato completo se encuentra en [`openapi.yaml`](openapi.yaml).
+
+| Método | Ruta | Descripción |
+| --- | --- | --- |
+| `GET` | `/health` | Comprueba que el proceso HTTP responde. No verifica la base de datos. |
+| `GET` | `/courses` | Consulta el catálogo de cursos, con paginación y filtros opcionales. |
+| `PUT` | `/skills-gap/input` | Reemplaza la instantánea de habilidades del usuario autenticado. |
+| `GET` | `/skills-gap` | Analiza la instantánea frente a un contexto de mercado configurado. |
+| `POST` | `/skills-gap/evaluate` | Evalúa cobertura y niveles explícitos por oferta, sin consultar PostgreSQL. |
+| `POST` | `/skills-gap/recommendations` | Compara habilidades por oferta y busca cursos para las no documentadas. |
+
+### Análisis de una oferta
+
+`POST /skills-gap/evaluate` recibe una proyección del CV y entre una y veinte ofertas. Por ejemplo:
+
+```json
+{
+  "cv": {
+    "id": "cv-123",
+    "skills": [
+      { "name": "Python", "level": "intermediate" },
+      { "name": "SQL", "level": "advanced" }
+    ]
+  },
+  "jobs": [
+    {
+      "id": "job-456",
+      "skills": ["Python", "SQL", "Docker"],
+      "description": "Se requiere Python avanzado y SQL básico.",
+      "requirements": ["Docker intermedio"]
+    }
+  ]
+}
+```
+
+La respuesta incluye, por oferta, la cobertura de habilidades documentadas, las habilidades no documentadas y el análisis de niveles cuando existe evidencia textual suficiente. Los resultados diferencian las comparaciones concluyentes de los requisitos desconocidos o contradictorios.
+
+Los niveles de CV utilizan la escala ordinal **`cv-skill-v1`**:
+
+| Valor | Nivel |
+| --- | --- |
+| `beginner` | Principiante |
+| `intermediate` | Intermedio |
+| `advanced` | Avanzado |
+| `expert` | Experto |
+
+Los déficits de nivel se expresan en **pasos ordinales**, no en porcentajes de conocimiento. `documentedCoveragePercent` mide coincidencias entre nombres de habilidades documentadas y exigidas; no mide competencia ni idoneidad para la contratación.
+
+### Recomendaciones y catálogo
+
+`POST /skills-gap/recommendations` recibe una proyección del CV y de las ofertas con identificadores y listas de habilidades. A diferencia de `/skills-gap/evaluate`, **no admite** `description` ni `requirements`. Las recomendaciones se basan en asociaciones explícitas del catálogo con habilidades **no documentadas**; actualmente no garantizan resolver déficits de nivel de habilidades ya declaradas.
+
+`GET /courses` admite los siguientes parámetros opcionales:
+
+| Parámetro | Uso |
+| --- | --- |
+| `page` | Página solicitada; predeterminada: `1`. |
+| `pageSize` | Cursos por página; predeterminados: `20`, máximo: `100`. |
+| `platform` | Coincidencia parcial insensible a mayúsculas por plataforma. |
+| `skillName` | Coincidencia parcial insensible a mayúsculas por habilidad. |
+| `isPaid` | `true` o `false`; si se omite, incluye ambos tipos. |
+
+El catálogo devuelve `items`, `page`, `pageSize` y `totalRecords`. Un resultado vacío no significa que la API haya fallado. Los cursos deben estar registrados y asociados con habilidades en PostgreSQL para aparecer en las consultas correspondientes.
+
+### Instantánea y mercado
+
+`PUT /skills-gap/input` recibe una lista completa de habilidades `{ skillName, level }`, la reemplaza de forma atómica y responde `204 No Content` si se guarda correctamente. El usuario se identifica mediante `X-User-Id` verificado detrás de APIM; el servicio almacena una clave derivada por SHA-256, no el correo, el token ni el CV original.
+
+`GET /skills-gap` utiliza esa instantánea y el contexto configurado en `SKILLS_GAP_MARKET_KEY`. Si aún no existe una instantánea responde `409 SKILLS_INPUT_REQUIRED`; si faltan la configuración o los recursos necesarios, puede responder `503`.
+
+## Requisitos previos
+
+- **Node.js 24** y npm.
+- **Docker Engine / Docker Desktop** con Docker Compose para ejecutar PostgreSQL localmente, o una instancia PostgreSQL de desarrollo configurada explícitamente.
+- Acceso a las variables de configuración necesarias para cada entorno.
 
 ## Ejecución local
 
-Requiere Node.js 24 y npm. Instalar dependencias con `npm ci`, copiar
-`.env.example` a `.env` y ejecutar `npm run dev`. Para ejecutar el compilado:
-`npm run build` y `npm start`. Se usa `PORT=3000` de forma predeterminada. Para pruebas sin certificado se requiere
-`APIM_ALLOW_INSECURE_LOCAL=true` además de development/test; el bypass se ignora en Azure.
-Con ese bypass el servidor escucha solo en `127.0.0.1`; sin él conserva la
-escucha en `0.0.0.0` y exige la configuración de seguridad del certificado.
+1. Clonar el repositorio e instalar las dependencias:
 
-`npm test` ejecuta las pruebas de integración con el runner de Node y `tsx`;
-cada servidor de prueba usa un puerto temporal en loopback y se cierra al finalizar.
-`npm run build` comprueba tipos y genera los archivos de producción en `dist`.
-Los tests TypeScript se ejecutan con `tsx` y no se incluyen en `dist`.
+   ```bash
+   git clone https://github.com/SoftwareDesignTEC/cvexpert-ms-brecha-cursos.git
+   cd cvexpert-ms-brecha-cursos
+   npm ci
+   ```
 
-## Flujo HTTP de análisis de brechas
+2. Crear el archivo de configuración local:
 
-PUT /skills-gap/input reemplaza la instantánea del usuario autenticado por APIM.
-GET /skills-gap reutiliza el motor ordinal y PostgreSQL, conserva la paginación y
-expone cobertura explícita. Escala cv-skill-v1: beginner=1, intermediate=2,
-advanced=3, expert=4; nunca porcentajes. El contexto se configura en el servidor
-con SKILLS_GAP_MARKET_KEY, sin default ficticio. Ambas rutas exigen certificado
-APIM validado e identidad; el bypass local del catálogo no las autoriza.
+   ```bash
+   cp .env.example .env
+   ```
 
-Contrato 0.2.0 implementado para revisión, pendiente de ratificación con clientes.
-Se admite durationHours null y se añaden analysis/deficitSteps: validar Web/Android
-antes de activar. Sin entrada: 409; sin contexto/DB: 503; sin mercado: 200 con
-cobertura incompleta/vacía explícita, nunca niveles o recomendaciones inventados.
-No hay mercado ni cursos productivos cargados por este cambio.
+   En PowerShell se puede usar `Copy-Item .env.example .env`. Editar `.env` y establecer una **contraseña local propia** en `PGPASSWORD`. No versionar este archivo.
 
-Ver [contrato, decisiones revisables, persistencia, pruebas y lista de activación
-productiva](docs/skills-gap-http.md). La [propuesta anterior](docs/skills-gap-input.proposed.yaml)
-es histórica, no aprobada: sus scaleKey/marketKey y niveles numéricos de entrada
-no son el contrato implementado. OpenAPI activo: openapi.yaml; Swagger protegido
-en /docs/. No se despliega ni modifica Azure/APIM, sus mocks o APIs de clientes.
+3. Iniciar PostgreSQL y aplicar las migraciones:
 
-## Organización
+   ```bash
+   docker compose config --quiet
+   docker compose up -d --wait postgres
+   npm run db:migrate
+   npm run db:check
+   ```
 
-- src/domain/cv-skill-v1.ts adapta niveles textuales o null a posiciones ordinales.
-- src/domain/skills-gap.ts conserva el motor de comparación y selección existente.
-- src/controllers/skills-gap.controller.ts exige identidad verificada y valida HTTP.
-- src/repositories/skills-gap.repository.ts lee mercado/cursos y guarda instantáneas.
-- db/migrations/003_create_user_skill_snapshots.sql añade almacenamiento sin historial.
-- test/app.test.ts y test/db/user-skill-snapshots.test.ts verifican el flujo y aislamiento.
+   El archivo `compose.yaml` publica PostgreSQL únicamente en `127.0.0.1:5433`; el contenedor utiliza el puerto interno `5432`. Los datos se conservan en un volumen de Docker.
 
-El [importador administrativo local de mercado](docs/market-import.md) y el de
-[catálogo](docs/catalog-import.md) siguen separados del HTTP y no se ejecutan al arrancar.
-Ninguna ruta llama directamente a otros microservicios. El diseño del motor y la
-evidencia histórica de consumidores están en [skills-gap-domain.md](docs/skills-gap-domain.md).
+4. Iniciar la API:
 
-## Contrato del catálogo — implementado, pendiente de ratificación
+   ```bash
+   npm run dev
+   ```
 
-`openapi.yaml` distingue el comportamiento disponible del diseño propuesto.
-Según el contexto confirmado del proyecto, Fase I ya contempla cursos sugeridos
-en `/skills-gap` y el documento de responsabilidades también exige documentar
-el catálogo. No se encontraron esos documentos fuente en este repositorio;
-no se atribuyen aquí otros requisitos a ellos.
+   El puerto predeterminado es `3000`. Con la configuración local de ejemplo (`NODE_ENV=development` y `APIM_ALLOW_INSECURE_LOCAL=true`), el servidor escucha únicamente en `127.0.0.1`.
 
-| Contrato o capacidad | Estado comprobado |
-| --- | --- |
-| `GET /health` | Implementado y documentado en OpenAPI. |
-| `GET /skills-gap` y cursos sugeridos | Motor conectado a instantáneas APIM; contrato 0.2.0 pendiente de ratificación, sin activación productiva. |
-| `page` y `pageSize` en `/skills-gap` | Implementados; nombres, valores predeterminados, límites y esquemas existentes se conservan. |
-| Catálogo PostgreSQL | Esquema, migraciones y seed opcional implementados; consultado por `/courses`. |
-| `GET /courses`, filtros y esquemas `CoursesPage`/`CatalogCourse` | Implementados conforme al borrador; sus decisiones contractuales requieren ratificación del equipo antes de fusionar el PR. No desplegado a Azure. |
-| Recomendaciones personalizadas reales e integración de identidad/APIM | Flujo HTTP implementado y probado localmente; falta validar clientes y la frontera TLS/identidad real de Azure/APIM. |
+5. Comprobar salud y catálogo:
 
-La web y Android continúan consumiendo `/skills-gap`. Documentar `/courses`
-no exige otra llamada para obtener sus recomendaciones ni sustituye el arreglo
-`courses` de cada brecha. No se crean endpoints administrativos ni contratos
-con otros microservicios. Los ejemplos del nuevo contrato son ficticios y no
-constituyen una prueba de que la ruta funcione.
+   ```bash
+   curl http://127.0.0.1:3000/health
+   curl 'http://127.0.0.1:3000/courses?page=1&pageSize=20'
+   ```
 
-### Consulta implementada conforme al borrador
+   La ruta de salud devuelve `{"status":"ok","service":"brecha-cursos"}` cuando el proceso responde. El catálogo puede estar vacío si no se han cargado cursos.
 
-`GET /courses` consulta el catálogo general, sin seleccionar un usuario.
-Se propone conservar el sobre `items`, `page`, `pageSize`, `totalRecords`, con
-valores predeterminados 1 y 20 y máximo `pageSize=100`. El total cuenta cursos
-únicos después de filtrar y antes de paginar. No se repite un curso por cada
-habilidad asociada. Una consulta sin coincidencias o una página fuera de rango
-devuelve, en la propuesta, HTTP 200 con `items: []` y el total correspondiente.
+> **Seguridad del entorno local:** el bypass de certificado habilita únicamente el entorno local de desarrollo/pruebas. **No permite ejecutar directamente** `/skills-gap`, `/skills-gap/input`, `/skills-gap/evaluate` o `/skills-gap/recommendations` sin un certificado APIM verificado e identidad válida. Para probar esos flujos sin infraestructura Azure, se utilizan las pruebas automatizadas con el entorno y los certificados de prueba controlados. No se deben falsificar encabezados de identidad en un entorno real.
 
-Se propone ordenar por ID SQL ascendente, como entero. Ordenar las cadenas
-públicas pondría por ejemplo `"10"` antes de `"2"`. La paginación por página no
-garantiza una instantánea si el catálogo cambia entre solicitudes. No se añade
-un parámetro de orden configurable ni paginación por cursor en este borrador.
+### Datos de demostración (opcional)
 
-| Filtro opcional propuesto | Respaldo en el modelo | Semántica propuesta |
-| --- | --- | --- |
-| `platform` | `courses.platform` | Coincidencia parcial insensible a mayúsculas (ILIKE), sin recortar espacios. |
-| `isPaid` | `courses.is_paid` | Literal `true` o `false`; omitirlo incluye ambos. |
-| `skillName` | `skills.name` y `course_skills` | Coincidencia parcial insensible a mayúsculas sobre el nombre de habilidad, mediante EXISTS. |
+En una **base local de desarrollo**, después de aplicar las migraciones, se puede ejecutar:
 
-La búsqueda parcial usa parámetros con porcentajes exteriores y escapa los caracteres
-SQL %, _ y ! (escape explícito), tratándolos como texto literal. Se aplica al
-catálogo completo antes de paginar y contar. Por ejemplo, micro y MICRO encuentran
-Microsoft Learn; git también coincide con GitHub. No se añaden equivalencias
-semánticas ni normalización de acentos: ILIKE conserva las diferencias de acentos
-según la configuración de PostgreSQL. No se requiere unaccent ni dependencias nuevas.
-El matching de brechas y recomendaciones por oferta conserva sus reglas exactas.
-
-Los filtros se combinan con AND. Se propone rechazar con HTTP 400 parámetros
-reconocidos repetidos, objetos, arreglos, vacíos o solo espacios; en paginación
-tampoco se aceptan signos, decimales, notación exponencial o números inseguros.
-Los parámetros desconocidos se ignoran en el catálogo; `/skills-gap` ahora los rechaza. También se rechaza NUL, no representable en `text` de PostgreSQL.
-Los errores implementados son 400 con `{ "error": "INVALID_QUERY", "message":
-"Parámetros de consulta inválidos." }` y 503 con `{ "error": "CATALOG_UNAVAILABLE",
-"message": "El catálogo no está disponible temporalmente." }`. Estos cuerpos
-concretan una parte no definida del borrador y requieren ratificación. No se
-exponen consultas, mensajes del driver, hosts ni contraseñas. Las respuestas de
-`/courses` llevan `Cache-Control: no-store`.
-
-Estos filtros son opciones de diseño respaldadas por las tablas, no requisitos
-confirmados de web o Android. No se proponen filtros de usuario, afinidad,
-nivel de mercado, idioma, puntuación o precio: no tienen respaldo en este modelo.
-
-### Curso de catálogo y curso sugerido
-
-CourseSuggestion y CatalogCourse conservan esquemas independientes. En 0.2.0 ambos
-permiten durationHours null, sin fabricar cero. Las sugerencias conservan IDs como
-cadenas opacas e incluyen isPaid/skills del catálogo. Este cambio explícito exige
-validación de clientes antes de activar; ver [compatibilidad](docs/skills-gap-http.md).
-
-### Decisiones para consultar al equipo
-
-1. El catálogo permite búsqueda parcial por plataforma y habilidad, insensible a mayúsculas.
-2. ¿Se aprueba la cadena decimal como ID público, y cómo se coordinará la
-   identidad de cursos entre catálogo y recomendaciones futuras?
-3. ¿Se aprueban `durationHours: null` y los campos `isPaid`/`skills` en el catálogo?
-4. ¿Qué política tendrá `/skills-gap` ante cursos persistidos sin duración,
-   manteniendo compatible el contrato actual de web y Android?
-5. ¿Qué política de acceso al catálogo se acordará y se ratifican los cuerpos
-   JSON 400/503 implementados y el rechazo de NUL?
-   El contrato activo exige certificado APIM para negocio y documentación.
-6. ¿Se aprueban el orden, los límites, las reglas de filtros combinados y los
-   estados HTTP propuestos antes de implementar la ruta?
-
-Todas las reglas nuevas de `/courses` requieren ratificación antes de fusionar.
-Implementarlas y documentarlas no las convierte en requisitos aprobados ni
-autoriza acceso público, autenticación nueva o despliegue.
-
-### Organización y consistencia de la consulta
-
-- `routes/courses.routes.ts`: registra solo `GET /courses`.
-- `controllers/courses.controller.ts`: valida los parámetros originales de la
-  URL, incluidos repetidos y claves con corchetes que un parser podría omitir.
-  Los desconocidos se ignoran. No se recortan valores para alterar coincidencias.
-- `services/courses.service.ts`: adapta filas SQL al modelo público, convirtiendo
-  IDs a cadenas y conservando los NULL de logo y duración.
-- `repositories/courses.repository.ts`: contiene una sentencia SQL fija con
-  parámetros para todos los valores del cliente, incluido LIMIT/OFFSET.
-
-La consulta usa un CTE filtrado y `EXISTS` para habilidades: cada curso aparece
-una vez. El arreglo de habilidades contiene todas las del curso, aunque el
-filtro seleccione una de ellas. Conteo y página salen del mismo SELECT y ven
-la misma instantánea, sin necesitar transacciones de escritura o permisos
-administrativos. El offset se calcula con `BigInt`, se envía como texto decimal
-y PostgreSQL lo recibe como `bigint`. Se aceptan páginas hasta el máximo entero
-seguro de JavaScript; incluso su offset con tamaño 100 cabe en bigint SQL.
-Una página enorme válida devuelve un arreglo vacío con el total real, sin
-redondeos ni multiplicaciones inseguras. El conteo exacto requiere recorrer el
-conjunto filtrado: evaluar planes y tiempos si el catálogo crece sustancialmente.
-
-El repositorio crea el pool solo ante una consulta válida de `/courses`. Iniciar
-Express, `/health` y `/skills-gap` no requieren PostgreSQL. Configuración inválida
-o base caída producen 503 solo en el catálogo, sin recurrir a datos ficticios.
-Al recibir SIGTERM/SIGINT, el servidor deja terminar peticiones y cierra el pool.
-No se llaman otros microservicios; los clientes transportan la información que
-corresponda entre dominios. Cálculo real de brechas y Service Bus siguen fuera
-de este PR.
-
-### Uso local y permisos de aplicación
-
-Usar un dueño local para migraciones/seed y `cvexpert_brecha_app` para HTTP.
-No ejecutar migraciones con el usuario de aplicación. Sobre PostgreSQL local,
-un administrador puede crear el rol si todavía no existe, asignarle una
-contraseña local mediante `\password cvexpert_brecha_app` en psql y conceder:
-
-```sql
-CREATE ROLE cvexpert_brecha_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
-GRANT CONNECT ON DATABASE cvexpert_catalog TO cvexpert_brecha_app;
-GRANT USAGE ON SCHEMA public TO cvexpert_brecha_app;
-GRANT SELECT ON public.courses, public.skills, public.course_skills TO cvexpert_brecha_app;
-```
-
-Son instrucciones para desarrollo local, no un script ejecutado por HTTP o
-una instrucción para modificar Azure. Si el rol existe, revisar sus permisos;
-no recrearlo. Para arrancar la app en otra terminal, configurar las variables
-existentes con `PGUSER=cvexpert_brecha_app` y su contraseña local. Las variables
-del proceso tienen prioridad sobre `.env`; no versionar contraseñas. Mantener
-TLS verificado donde ya sea obligatorio; el modo sin TLS del PostgreSQL de
-pruebas local no se extiende a producción.
-
-Ejemplo de consulta local (no requiere agregar autenticación nueva):
-
-```sh
-curl 'http://127.0.0.1:3000/courses?page=1&pageSize=20&isPaid=false'
-```
-
-Para una demostración **local opcional**, usar el mecanismo separado ya existente:
-con cuenta dueña, `NODE_ENV=development`, `PGHOST=127.0.0.1` y base local,
-ejecutar `npm run db:migrate` y luego `npm run db:seed`. Después consultar con
-la cuenta SELECT. El seed usa `[DEMO]`, plataforma ficticia y `example.org`,
-es repetible y no se ejecuta automáticamente al arrancar ni en CI/producción.
-No ejecutarlo con credenciales o contra una base Azure. Los fixtures `[TEST]`
-de pruebas son diferentes y solo existen en bases desechables; ningún registro
-de demostración o prueba representa recomendaciones reales de `/skills-gap`.
-
-## PostgreSQL local — Etapa A
-
-Requisitos adicionales: Docker Engine o Docker Desktop con contenedores Linux
-y Docker Compose. No hace falta instalar PostgreSQL en el host.
-La etapa de infraestructura precedió a `/courses`, implementado ahora según el
-borrador sin cambiar el contrato de `/skills-gap`.
-
-### Preparación y variables
-
-1. Ejecutar `npm ci`.
-2. Copiar `.env.example` a `.env` (si ya existe, completar sus variables sin
-   sobrescribir la configuración local).
-3. Completar `PGPASSWORD` en `.env` con una contraseña local propia.
-   El ejemplo versionado deja ese valor vacío deliberadamente.
-4. Ejecutar `docker compose config --quiet` para validar Compose sin imprimir
-   la configuración resuelta, que contiene la contraseña.
-
-| Variable | Uso |
-| --- | --- |
-| `NODE_ENV` | `development` local; el seed solo acepta `development` o `test`. |
-| `PGHOST` | `127.0.0.1` desde Node en el host. |
-| `PGPORT` | `5433` desde el host; el contenedor escucha en `5432`. |
-| `PGDATABASE` | Nombre de la base local, también usado por Compose al inicializar. |
-| `PGUSER` | Usuario local, también usado por Compose al inicializar. |
-| `PGPASSWORD` | Contraseña local obligatoria; no colocar en Git ni en comandos compartidos. |
-| `DB_SSL_MODE` | `disable` local; `verify-full` valida TLS, certificado y hostname. Por defecto es `verify-full`. |
-| `PGSSLROOTCERT` | Ruta opcional a una CA PEM confiable; vacío usa las CA de Node. |
-
-Compose lee `.env` para sustituir variables y envía únicamente las variables
-`POSTGRES_*` al contenedor. Los comandos de Node cargan `.env` mediante dotenv;
-las variables que ya existan en el proceso tienen prioridad. La app HTTP no
-crea el pool ni requiere estas variables mientras no use el catálogo.
-
-`.env` está excluido por `.gitignore`; `.env.example` contiene nombres y valores
-no secretos. Comprobar con `git check-ignore .env` y revisar el diff antes de
-versionar. No usar una URL de conexión con contraseña: esta implementación
-usa variables separadas y no imprime la configuración de conexión.
-
-### Arranque, migraciones y seed opcional
-
-```sh
-docker compose up -d --wait postgres
-npm run db:migrate
-npm run db:check
-# Opcional, exclusivamente para demostración local:
+```bash
 npm run db:seed
 npm run db:check
-# Pruebas de integridad y migraciones en bases desechables:
-npm run db:test
 ```
 
-`db:check` consulta el servidor y las tres tablas, muestra conteos y hasta diez
-cursos con sus habilidades. Si falta migrar, falla con código de salida 1.
-`db:test` requiere PostgreSQL local en loopback, `NODE_ENV=development` o `test`
-y un usuario con permiso `CREATEDB` (el usuario del Compose local lo tiene).
-Las pruebas HTTP del catálogo requieren además el rol local `cvexpert_brecha_app`
-sin privilegios administrativos y `PG_READONLY_PASSWORD` con su contraseña solo
-para estas pruebas. Cada base aislada concede únicamente USAGE de schema y SELECT
-en las tres tablas a ese rol. En CI, ambos roles se crean en el contenedor
-desechable con contraseñas ficticias exclusivas de prueba; nunca en Azure.
-Se conecta a la base administrativa `postgres` para crear bases vacías con
-`TEMPLATE template0`, nombradas `cvexpert_test_<UUID>`. Nunca usa `PGDATABASE`
-como destino de las pruebas ni modifica sus tablas o secuencias.
+El seed contiene datos de demostración, no cursos ni requisitos de mercado verificados. No debe ejecutarse sobre una base de producción.
 
-Cada base creada pertenece a una ejecución: al finalizar, incluso ante errores,
-se cierran sus pools y se intenta eliminar exclusivamente esa base mediante
-`DROP DATABASE`, sin `FORCE` ni terminación de conexiones ajenas. Si no se puede
-crear o limpiar, las pruebas fallan; no se recurre a la base de desarrollo.
-Una interrupción abrupta del proceso puede dejar una base de prueba pendiente
-de revisión y limpieza manual. No se borra ni restablece el volumen Docker.
+Para compilar y ejecutar el resultado generado:
 
-Las pruebas del catálogo migran su base aislada y prueban restricciones y
-eliminaciones reales sobre fixtures dentro de transacciones revertidas. Las
-del ejecutor usan copias temporales de los SQL para probar primera aplicación,
-repetición, checksum alterado, rollback completo de DDL y concurrencia. Esta
-última observa dos ejecutores esperando el advisory lock antes de liberarlo;
-no depende de suponer que un sleep causó una carrera. También se simula un
-fallo de `pool.connect()` y se comprueba que el pool quede cerrado.
-
-Los comandos npm usan `tsx` como herramienta de desarrollo. Tras compilar,
-también se pueden ejecutar `node dist/db/cli.js migrate`, `seed` o `check`,
-conservando la carpeta `db/` junto a `dist/` en la raíz. Los archivos SQL no
-son copiados por TypeScript.
-
-### Docker, red y persistencia
-
-`compose.yaml` usa la imagen oficial `postgres:17-bookworm`, fijando la versión
-mayor 17 y la familia Debian. La etiqueta recibe parches; para fijar exactamente
-los mismos binarios se podría elegir un digest en una etapa posterior.
-
-El servicio vive en la red predeterminada de este proyecto Compose. Solo
-publica `127.0.0.1:5433:5432`: Node conecta a `127.0.0.1:5433`, Docker dirige
-esa conexión al puerto `5432` del contenedor y no publica el servicio en otras
-interfaces del host. Si Node se contenedorizara después, usaría el nombre de
-servicio `postgres` y el puerto interno `5432`; eso no se implementa aquí.
-
-El healthcheck usa `pg_isready` para comprobar que el motor acepta conexiones;
-no certifica que las tablas existan o que el seed se haya cargado. Por eso
-existe `db:check`. `--wait` espera el estado saludable antes de terminar.
-
-El volumen nombrado `postgres_data` se monta en `/var/lib/postgresql/data`,
-la ruta de datos de esta imagen PostgreSQL 17. Compose lo identifica como
-`cvexpert-brecha-cursos_postgres_data`. El volumen existe independientemente
-del proceso y del contenedor: reiniciar o recrear el contenedor conserva los
-datos si se conecta el mismo volumen. No reemplaza una copia de seguridad.
-
-Las variables `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` inicializan
-un volumen vacío. Cambiarlas después en `.env` no renombra la base ni cambia
-la contraseña almacenada: eso requiere una operación explícita en PostgreSQL,
-no borrar el volumen. El usuario inicial de la imagen tiene privilegios de
-administrador; es una simplificación local, pendiente de separar roles antes
-de cualquier despliegue real.
-
-Para comprobar persistencia sin borrar datos:
-
-```sh
-npm run db:check
-docker compose stop postgres
-docker compose up -d --wait postgres
-npm run db:check
+```bash
+npm run build
+npm start
 ```
 
-Los conteos y los cursos deben mantenerse. Para dejarlo detenido:
-`docker compose stop postgres`. `docker compose down` retira contenedor y red
-y conserva el volumen nombrado por defecto. No agregar opciones para borrar
-volúmenes ni ejecutar comandos de limpieza destructiva sin autorización.
+## Configuración
 
-### Modelo y restricciones
+Las variables disponibles para la ejecución local se documentan en [`.env.example`](.env.example).
 
-La relación es `courses 1 — N course_skills N — 1 skills`: un curso enseña varias
-habilidades y una habilidad puede enseñarse en varios cursos. Separar las tres
-tablas evita repetir cursos o guardar listas de IDs en una columna.
+| Variable | Función |
+| --- | --- |
+| `PORT` | Puerto HTTP, predeterminado `3000`. |
+| `NODE_ENV` | Entorno de ejecución. |
+| `APIM_ALLOW_INSECURE_LOCAL` | Omite la comprobación del certificado únicamente en desarrollo/pruebas locales permitidas. |
+| `APIM_CERT_THUMBPRINTS` | Huellas autorizadas de certificados cliente APIM. |
+| `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` | Conexión PostgreSQL. |
+| `DB_SSL_MODE`, `PGSSLROOTCERT` | Configuración de verificación TLS para PostgreSQL. |
+| `SKILLS_GAP_MARKET_KEY` | Contexto de mercado seleccionado por el servidor para `GET /skills-gap`. |
 
-- `skills.id` y `courses.id`: `integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY`.
-  PostgreSQL genera IDs; la PK identifica cada fila sin duplicados ni NULL.
-  Un entero de 32 bits es suficiente para este catálogo universitario y llega
-  a Node como `number`. UUID permitiría generar IDs distribuidos, pero hoy no
-  existe ese requisito; `bigint` agregaría conversión porque `pg` lo devuelve
-  como texto para evitar pérdida de precisión.
-- Nombres, títulos, plataformas y URLs: `text`, sin máximos arbitrarios.
-  Campos obligatorios usan `NOT NULL`; los nombres, títulos y plataformas
-  rechazan vacío y espacios exteriores. `skills.name` es único con comparación
-  sensible a mayúsculas. Normalización de nombres y sinónimos queda pendiente.
-- `courses.url` es única por URL exacta: primera regla local de deduplicación.
-  Título y plataforma no son únicos; dos cursos pueden compartirlos.
-  Una restricción básica exige enlaces HTTP(S) sin espacios, sin prometer que
-  la URL exista. Canonicalización y validación completa quedan pendientes.
-- `is_paid`: `boolean NOT NULL`, sin valor predeterminado para exigir una decisión
-  explícita al insertar. `duration_hours`: `integer NULL` con `CHECK >= 0`;
-  NULL significa desconocido y 0 no significa desconocido. Se mantienen horas
-  enteras en línea con el contrato preliminar; fracciones requerirían revisión.
-  `logo_url` admite NULL o un enlace HTTP(S).
-- `course_skills`: PK `(course_id, skill_id)` impide repetir una asociación.
-  Las FK exigen que ambos extremos existan. `ON DELETE CASCADE` en `course_id`
-  limpia solo asociaciones al eliminar un curso; no elimina habilidades.
-  `ON DELETE RESTRICT` en `skill_id` impide borrar una habilidad aún utilizada.
-  Actualizar IDs utiliza la regla predeterminada `NO ACTION`.
-- PostgreSQL crea índices para las PK y los `UNIQUE`. La PK compuesta cubre
-  búsquedas por curso; el índice `(skill_id, course_id)` cubre consultas por
-  habilidad y comprobaciones de su FK. No se añaden índices especulativos para
-  búsquedas HTTP que aún no existen.
+Fuera del entorno local se requiere la configuración de seguridad apropiada. La conexión PostgreSQL productiva exige verificación TLS, y el certificado cliente de APIM debe ser autorizado por el backend.
 
-No se agregan tablas de usuarios, habilidades personales o recomendaciones.
-La migración 002 agrega la copia local de requisitos del mercado descrita en
-[el diseño del núcleo](docs/skills-gap-domain.md); no inserta requisitos reales ni demo.
-Los IDs SQL son internos; no establecen cómo se expondrán en un futuro contrato HTTP.
+## Seguridad e integración con APIM
 
-**Incompatibilidad pendiente entre persistencia y contrato HTTP:** PostgreSQL
-permite `courses.duration_hours = NULL`, pero el esquema `CourseSuggestion` de
-OpenAPI exige `durationHours` entero no nullable (el modelo TypeScript usa
-`number`). Además, PostgreSQL genera IDs enteros y ese contrato exige `id` de
-tipo cadena (`string`). No es correcto devolver directamente una fila SQL como
-respuesta HTTP ni convertir una duración desconocida en cero arbitrariamente.
-Antes de conectar el catálogo a la API debemos acordar con el equipo la
-nulabilidad, la representación de IDs y el mapeo entre ambos modelos. Esta
-etapa de PostgreSQL no modificó los esquemas existentes de la API. El borrador
-de `/courses` propone un mapeo independiente, todavía sin aprobar; no modifica
-`CourseSuggestion` ni los modelos TypeScript implementados.
+En CVExpert, la web y Android llaman al gateway con su token de Google. APIM valida la autenticación, sobrescribe `X-User-Id` y `X-User-Email`, selecciona este backend y presenta un certificado cliente durante la conexión HTTPS.
 
-### Migraciones y datos de demostración
+En el backend, el middleware valida el certificado reenviado por la infraestructura de Azure. Las rutas `/skills-gap*` comprueban, además, la identidad del usuario. El backend no valida directamente el token de Google ni debe aceptar los encabezados de identidad enviados por un cliente externo sin esa frontera de confianza.
 
-Una migración cambia la estructura de la base. `db/migrations/NNN_descripcion.sql`
-se ejecuta en orden y queda registrada en `schema_migrations` con fecha y SHA-256.
-El ejecutor normaliza CRLF/LF para evitar diferencias entre Windows y Linux.
-Todas las migraciones pendientes y sus registros se aplican en una transacción:
-si alguna falla, se revierte el lote. Un advisory lock transaccional serializa
-nuestros comandos de migración y seed; un timeout evita esperas indefinidas.
+La ruta `/health` se declara antes del middleware de certificado, pero una configuración TLS de Azure que exija certificado puede impedir que una llamada anónima alcance siquiera Express. Que `/health` responda tampoco demuestra disponibilidad de PostgreSQL.
 
-Repetir `npm run db:migrate` no reaplica lo registrado. Si cambia o desaparece
-un archivo aplicado, o se inserta otro antes del historial ya aplicado, el comando
-falla. Nunca editar migraciones aplicadas: agregar `002_...sql` y siguientes.
-Los archivos deben contener SQL transaccional, sin `BEGIN`/`COMMIT` propios ni
-operaciones como `CREATE INDEX CONCURRENTLY`. No hay comando `down`, reset,
-`DROP` ni rollback destructivo. Las migraciones futuras aún requieren revisión
-y respaldo: un ejecutor no convierte cualquier SQL en seguro.
+La publicación de operaciones en APIM, los certificados y los datos del entorno deben verificarse por separado del código de la API. Véase [seguridad y preparación de APIM](docs/apim-security.md).
 
-Consideramos `node-pg-migrate` (más funciones, otra dependencia) y SQL con un
-ejecutor pequeño. Se eligió la segunda opción para mantener el esquema legible
-y defendible. Si aumentan las necesidades operativas, conviene adoptar una
-herramienta mantenida en lugar de ampliar indefinidamente este ejecutor.
+## Base de datos
 
-Un seed inserta datos, no estructura. `db:seed` es opcional, no lo llama la
-migración ni el arranque de Express o Docker. Solo permite `development`/`test`,
-incluso si falta `NODE_ENV` lo rechaza. Los ejemplos usan `[DEMO]` y enlaces
-`example.org`; `ON CONFLICT DO NOTHING` y las restricciones únicas evitan
-duplicados al repetirlo sin sobrescribir filas existentes. No usar una base de
-producción con `NODE_ENV=development`: la aplicación confía en esa configuración.
+Las tablas principales son `skills`, `courses`, `course_skills`, `market_requirements` y `user_skill_snapshots`. `course_skills` modela la relación muchos-a-muchos entre cursos y habilidades. Las migraciones incluyen además el registro `admin_import_runs` para el mantenimiento administrativo.
 
-### Pool, TLS y límites de esta etapa
+Las migraciones están en [`db/migrations/`](db/migrations/). No se ejecutan automáticamente al iniciar el servidor: deben aplicarse mediante un proceso de mantenimiento autorizado. Las operaciones del catálogo utilizan consultas parametrizadas; los procedimientos de importación se encuentran separados de las rutas HTTP.
 
-`src/db/config.ts` valida variables y configura conexión; `pool.ts` crea un
-pool bajo demanda. Un pool reutiliza conexiones en vez de abrir una por consulta;
-se limita a cinco, con espera de conexión de cinco segundos, timeout de consulta
-de quince segundos y cierre de conexiones inactivas tras treinta segundos.
-Los comandos liberan los clientes de transacción y cierran el pool al terminar.
-No existe conexión global abierta al importar Express.
+## Pruebas
 
-Para un servidor futuro con TLS, usar `DB_SSL_MODE=verify-full`, hostname real
-y, si es necesario, `PGSSLROOTCERT`. Nunca se usa `rejectUnauthorized: false`.
-Fuera de desarrollo/pruebas el código rechaza TLS deshabilitado. Esta preparación
-no provisiona Azure ni comprueba todavía certificados contra un servidor remoto.
-
-PostgreSQL encaja porque este dominio necesita relaciones muchos a muchos,
-integridad referencial, unicidad y transacciones. SQLite simplificaría el arranque,
-pero no verificaría el motor PostgreSQL solicitado; un almacén documental haría
-menos directa la integridad de estas asociaciones.
-
-Pendientes: ratificación del contrato `/courses` con el equipo, política
-de URLs y nombres, roles de mínimo privilegio, respaldo/restauración, credenciales
-administradas y validación TLS remota. Las pruebas normales (`npm test`) no
-necesitan PostgreSQL; las de integración (`npm run db:test`) sí lo necesitan.
-
-## CI/CD con GitHub Actions
-
-El workflow `.github/workflows/ci-cd.yml` ejecuta CI para PR cuyo destino sea
-`develop` o `main`, y para pushes a `develop` y `main`. Las acciones oficiales están fijadas
-por SHA de commit. No usa `pull_request_target`, publish profiles ni credenciales
-de Azure para validar contribuciones.
-
-### CI: Node 24 y PostgreSQL 17 desechable
-
-En Ubuntu 24.04, con Node.js 24, el job ejecuta en orden:
-
-```sh
-npm ci
-npm audit --audit-level=high
+```bash
 npm run build
 npm test
+```
+
+Las pruebas de dominio y HTTP se ejecutan mediante el runner de Node.js. Para las pruebas de integración con PostgreSQL:
+
+```bash
 npm run db:test
 ```
 
-PostgreSQL 17 se crea como service container, sin volumen persistente, con
-credenciales públicas exclusivamente de prueba y `PGHOST=127.0.0.1`, puerto
-5432, `NODE_ENV=test` y TLS desactivado solo para esta conexión local.
-El usuario bootstrap `postgres`, exclusivo de ese contenedor, crea un rol de
-pruebas distinto con LOGIN y CREATEDB, sin SUPERUSER ni CREATEROLE. Crea también
-`cvexpert_brecha_app` sin CREATEDB, SUPERUSER o CREATEROLE para probar SELECT
-y la denegación efectiva de escrituras. No se añaden privilegios al rol HTTP.
-Las pruebas crean y eliminan únicamente sus bases
-`cvexpert_test_<UUID>`; el contenedor completo desaparece al terminar el job.
-No se usa `.env`, Key Vault ni Azure PostgreSQL, no se ejecuta el seed y no se
-llama a `db:migrate` sobre ninguna base compartida o de producción.
+`db:test` requiere un PostgreSQL **local de pruebas**, permisos adecuados para crear bases desechables y, para determinadas pruebas, un rol de aplicación de solo lectura. La preparación y los controles se detallan en [la documentación de PostgreSQL y mantenimiento](docs/catalog-import.md). No debe apuntarse a una base de datos operativa.
 
-El filtro de rutas está dentro del workflow, no en `on.paths`, para no dejar un
-check requerido pendiente en PR de documentación. Solo omite el job Node/PG
-cuando TODOS los archivos modificados son `README.md` o Markdown bajo `docs/`.
-Cambios de código, tests, SQL, dependencias, `.github`, OpenAPI, configuraciones
-y cualquier ruta desconocida ejecutan la suite. Los renombrados consideran tanto
-la ruta antigua como la nueva. Incluso un PR solo documental prueba los guards.
-Los pushes a `develop` y `main` siempre ejecutan CI completo, independientemente
-de las rutas, incluida la comprobación del ZIP de producción.
+La carpeta [`postman/`](postman/) incluye una colección y entornos para comprobaciones HTTP. Las pruebas directas del servicio no equivalen por sí solas a una verificación completa mediante APIM.
 
-El job final **CI** siempre se evalúa y falla si fallaron la clasificación o las
-pruebas requeridas o la comprobación del paquete de producción. Configurar ese check como obligatorio en las reglas de
-protección de `develop` y `main`; el workflow no modifica esas reglas. Requerir
-también revisión de cambios en `.github/`. Los runs anteriores del mismo PR se
-cancelan; un despliegue en ejecución no se cancela por un push posterior.
+## Mantenimiento del catálogo y del mercado
 
-Para probar localmente los guards sin Azure ni PostgreSQL:
+El repositorio contiene herramientas separadas del servidor para revisar e importar información:
 
-```sh
-node --test .github/scripts/*.test.mjs
-```
+| Comando | Propósito |
+| --- | --- |
+| `npm run db:catalog:import` | Revisar o importar lotes del catálogo, según la configuración y autorización local. |
+| `npm run db:market:import` | Revisar o importar requisitos de mercado en un contexto definido. |
+| `npm run courses:discover -- --dry-run --fixture` | Ejecutar una demostración reproducible del descubrimiento de cursos con datos de prueba. |
+| `npm run db:admin:preview` | Examinar un lote administrativo antes de su aplicación. |
 
-El job de clasificación también valida los workflows con `actionlint` 1.7.12,
-descargado de la release oficial y comprobado contra un SHA-256 fijo en
-`.github/scripts/actionlint.sh`. No ejecuta un instalador `latest`. Esta
-validación y los tests de guards se ejecutan también en PR solo documentales.
+Estas herramientas tienen controles de permisos y procedimientos específicos. Consultar su documentación antes de utilizar opciones de escritura. El descubrimiento con fuentes externas **no publica automáticamente los resultados** en la base de datos: los candidatos requieren revisión.
 
-La auditoría npm incluye dependencias de desarrollo y bloquea CI ante severidad
-alta o crítica; no hay `continue-on-error`, excepciones de avisos ni arreglos
-forzados. Un fallo del servicio de auditoría tampoco se convierte en éxito.
-La revisión de GHSA-27r3-jxmh-p828 actualizó el lockfile de `body-parser` 2.3.0
-a 2.4.0, compatible con `express@5.3.0` y su rango `^2.3.0`. No se añadieron
-dependencias directas, overrides o cambios mayores. Para auditar solo runtime:
+La actualización automática periódica del catálogo y la publicación del evento `course.recommended` hacia Azure Service Bus **no están integradas como funcionalidades productivas** en este repositorio.
 
-```sh
-npm audit --omit=dev
-```
+## CI/CD
 
-### Comprobación del ZIP sin desplegar
+El workflow [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) verifica el proyecto en las ramas `develop` y `main`, ejecutando compilación, pruebas y controles del paquete de producción según los archivos modificados.
 
-Después de las pruebas, el job `Verify production ZIP (no deployment)` descarga
-el compilado del mismo run y ejecuta `.github/scripts/package-app.sh`. Construye
-el ZIP desde una lista permitida, no desde todo el workspace, y elimina de la
-copia los CLI compilados de migraciones y seeds. El verificador
-`verify-package.mjs` comprueba OpenAPI, las rutas del ZIP, la presencia de `dist/server.js`,
-`dist/app.js`, manifiestos y dependencias de producción; rechaza `.env`, SQL,
-directorios de migraciones/seeds, los CLI administrativos, archivos de claves,
-credenciales con nombres conocidos y rutas que intenten salir del directorio.
-Los tests negativos comprueban que esas entradas sean rechazadas.
+El despliegue en Azure App Service requiere habilitación explícita mediante `ENABLE_AZURE_DEPLOY` y configuración autorizada del entorno. Una ejecución correcta de CI no confirma por sí sola que una revisión esté desplegada o que se haya probado todo el flujo de APIM a PostgreSQL.
 
-Luego extrae ese mismo ZIP en un directorio temporal y ejecuta el servidor
-compilado real con `NODE_ENV=production` y un puerto local temporal, sin heredar
-variables PG, Azure o tokens GitHub. Exige `/health=200` con su JSON exacto y
-`/skills-gap=503` y `/courses=503` sin configuración PostgreSQL, manteniendo
-`/health=200`. Ejecuta una vez sin configuración de certificado para comprobar
-el cierre por defecto y otra con un certificado público de prueba autorizado
-para verificar Swagger, sus recursos y OpenAPI dentro del paquete. No simula
-la negociación TLS de Azure. Cierra el proceso y elimina únicamente los archivos temporales.
-La verificación forma parte del check obligatorio CI; no necesita OIDC o Azure.
-El filtrado de archivos no es un detector exhaustivo de secretos incrustados en
-código: sigue siendo necesario revisar que no se versionen credenciales.
+## Documentación adicional
 
-### CD: preparado, desactivado por defecto
+- [Contrato OpenAPI](openapi.yaml): operaciones, parámetros, ejemplos y respuestas.
+- [Análisis de brechas por oferta](docs/job-specific-skills-gap.md): cobertura y recomendaciones contextualizadas.
+- [Extracción y comparación de niveles](docs/job-required-skill-levels.md): reglas, evidencia y casos no concluyentes.
+- [Análisis frente al mercado](docs/skills-gap-http.md): instantáneas, resultados y errores.
+- [Seguridad y certificado APIM](docs/apim-security.md): frontera de confianza y configuración.
+- [Catálogo e importaciones](docs/catalog-import.md): estructura, validaciones y mantenimiento.
+- [Importación de requisitos de mercado](docs/market-import.md): contexto y revisión de fuentes.
+- [Descubrimiento de cursos](docs/course-discovery.md): proveedores, candidatos y límites de automatización.
+- [Pruebas con Postman](postman/README.md): colección, entornos y escenarios.
 
-No se ha desplegado a Azure como parte de esta implementación. El destino está
-fijado a App Service Linux `cvexpert-ms-brecha-cursos` en `rg-cvexpert`.
-Solo un push a `main`, después de CI exitoso para ese mismo commit y con la
-variable de repositorio `ENABLE_AZURE_DEPLOY` exactamente igual a `true`, puede
-publicar el artefacto destinado a Azure e iniciar el job de despliegue. Ausente o con cualquier otro valor,
-CD permanece desactivado. No hay disparador manual ni despliegue desde PR,
-`develop` o `workflow_run` de otro workflow.
+---
 
-Se empaqueta el `dist` que pasó las pruebas junto a `package.json`, el lockfile
-y dependencias de producción instaladas con `npm ci --omit=dev --ignore-scripts`.
-El ZIP tiene los archivos en su raíz y no incluye `.env`, fuentes, archivos SQL, datos de seed,
-tests o credenciales locales. La instalación sin scripts sirve para las
-dependencias actuales; si se agregan dependencias que compilan código nativo,
-habrá que revisar este paso y su compatibilidad con el runtime de App Service.
-Los artefactos duran un día y se consumen en el mismo run, identificados por SHA.
-No se ejecutan migraciones, seeds o pruebas de base de datos en el job Azure.
-La creación y comprobación local del ZIP sí ocurre en los PR de código y pushes
-a ambas ramas, aunque el despliegue esté desactivado.
-
-El job usa `azure/login` con OIDC y `az webapp deploy` con autenticación Entra;
-no genera ni descarga credenciales de publicación. Solo ese job recibe
-`id-token: write`; los demás tienen únicamente `contents: read`. El token OIDC
-es efímero. La autenticación GitHub-Azure no lee secretos de Key Vault.
-
-### Preparación administrativa pendiente (no automatizada)
-
-1. Crear una aplicación de Entra/service principal **exclusiva para despliegue**.
-   No reutilizar la identidad administrada de la aplicación que consume Key Vault.
-   Conceder, como punto de partida, Website Contributor limitado al recurso
-   App Service, no a la suscripción ni a todo `rg-cvexpert`. Revisar si un rol
-   personalizado puede reducirlo más. No conceder permisos de lectura de secretos
-   de Key Vault a esta identidad de despliegue.
-2. Configurar su federación con issuer `https://token.actions.githubusercontent.com`,
-   audience `api://AzureADTokenExchange` y subject
-   `repo:SoftwareDesignTEC/cvexpert-ms-brecha-cursos:environment:azure-production`.
-   Al usar un environment el subject no es `ref:refs/heads/main`: la restricción
-   de rama se configura además en GitHub y ya se verifica en el workflow.
-3. Crear el environment GitHub `azure-production`, permitir despliegue solamente
-   desde `main` y exigir revisión/aprobación del equipo (según capacidades del plan).
-   Mantener las protecciones de rama y del environment; el YAML no las crea.
-4. Registrar las variables no secretas `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` y
-   `AZURE_SUBSCRIPTION_ID` en ese environment. Son identificadores, no client
-   secrets. Mantener por separado los secretos reales de runtime en Key Vault,
-   accesibles solo mediante la identidad administrada y sus referencias existentes.
-5. Proveer un runner Linux dedicado y confiable con acceso al endpoint SCM privado,
-   Node 24 compatible y Azure CLI; registrar su label en la variable **de repositorio**
-   `AZURE_DEPLOY_RUNNER`. Nunca usar ese runner para PR no confiables. Sin label,
-   el job falla antes de iniciar sesión; no intenta abrir firewalls para desplegar.
-6. Revisar y preparar la conectividad privada de App Service/SCM y APIM, DNS y
-   certificados. El preflight exige `publicNetworkAccess=Disabled`, HTTPS y TLS
-   >=1.2 tanto en la aplicación como en SCM. No basta `clientCertMode=Required`:
-   App Service reenvía certificados y el código actual no los valida. Esta
-   implementación no abre acceso público ni implementa validación de certificados
-   o integración APIM; una alternativa pública restringida requerirá otro diseño
-   y aprobación. Un runner hospedado estándar no alcanza un SCM solo privado.
-7. Preparar en App Service `NODE|24-lts`, comando de arranque `npm start` o
-   `node dist/server.js`, `NODE_ENV=production`, y las opciones
-   `SCM_DO_BUILD_DURING_DEPLOYMENT=false` y `ENABLE_ORYX_BUILD=false`.
-   Deshabilitar publicación básica tanto en SCM como FTP. El workflow consulta
-   y verifica estas opciones; no modifica configuración, red, roles o identidades.
-8. El preflight compara el `oid` del principal autenticado con los principal IDs
-   de las identidades administradas asignadas al App Service y rechaza reutilizarlas.
-   La lectura del token queda en memoria, sin imprimirlo ni guardarlo. Confirmar
-   además administrativamente que el principal de despliegue no tiene permisos
-   heredados sobre Key Vault.
-9. Solo después de revisar estos puntos, habilitar `ENABLE_AZURE_DEPLOY=true`
-   a nivel de repositorio y promover cambios a `main` mediante PR. Los workflows
-   deben estar presentes en `main` para que un push a esa rama active el proceso.
-   Este PR hacia `develop` por sí solo no despliega.
-
-La seguridad del acceso y la verificación funcional a través de APIM quedan
-pendientes. El preflight falla cerrado si falta alguna condición; no hace un
-smoke test anónimo contra el backend ni transforma un despliegue en aprobación
-de sus endpoints de negocio. `/skills-gap` exige configuración, instantánea y contexto revisado; `/courses` está implementado pero no se
-despliega ni se conecta a Azure como parte de este PR.
-
-### Alcance limitado del preflight Azure
-
-El preflight es una consulta de **configuración de control plane**, no una prueba
-de APIM, mTLS ni salud funcional de la aplicación desplegada. No realiza ni
-modifica conexiones a Azure PostgreSQL, red, identidades o datos de negocio.
-Sus condiciones se mantienen sin relajarlas para permitir un despliegue.
-
-Quedan sin comprobar y requieren validación independiente antes de habilitar CD:
-
-- Certificados: cadena de confianza, vigencia, revocación y validación efectiva
-  del certificado cliente y su identidad. Leer opciones HTTPS/TLS o exigir red
-  privada no demuestra mTLS; el código actual no valida certificados cliente.
-- Conectividad APIM-backend: DNS privado, rutas, reglas de acceso y negociación
-  TLS desde APIM hacia el backend real.
-- Funcionamiento desplegado: arranque efectivo, health check a través del camino
-  autorizado y comportamiento de las operaciones reales. El smoke test del ZIP
-  solo demuestra arranque local del paquete, no la integración con Azure/APIM.
-- Autorización: comparar principal IDs evita reutilizar la identidad administrada,
-  pero no demuestra ausencia de privilegios excesivos o heredados sobre Key Vault.
-
-Un preflight exitoso no sustituye estas pruebas ni constituye aprobación para
-abrir el backend o activar el despliegue.
-
-Referencias: [PostgreSQL en Actions](https://docs.github.com/en/actions/tutorials/use-containerized-services/create-postgresql-service-containers),
-[OIDC y mínimo alcance en App Service](https://learn.microsoft.com/en-us/azure/app-service/deploy-github-actions),
-[certificados cliente en App Service](https://learn.microsoft.com/en-us/azure/app-service/app-service-web-configure-tls-mutual-auth).
+**CVExpert — Proyecto de Diseño de Software.**
