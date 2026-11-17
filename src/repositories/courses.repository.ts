@@ -24,12 +24,12 @@ const catalogSql = `
     WITH filtered AS MATERIALIZED (
         SELECT c.id, c.title, c.url, c.platform, c.logo_url, c.duration_hours, c.is_paid
         FROM public.courses c
-        WHERE ($1::text IS NULL OR c.platform = $1)
+        WHERE ($1::text IS NULL OR c.platform ILIKE $1 ESCAPE '!')
           AND ($2::boolean IS NULL OR c.is_paid = $2)
           AND ($3::text IS NULL OR EXISTS (
               SELECT 1 FROM public.course_skills cs
               JOIN public.skills s ON s.id = cs.skill_id
-              WHERE cs.course_id = c.id AND s.name = $3
+              WHERE cs.course_id = c.id AND s.name ILIKE $3 ESCAPE '!'
           ))
     ), paged AS (
         SELECT * FROM filtered ORDER BY id ASC LIMIT $4::integer OFFSET $5::bigint
@@ -46,6 +46,11 @@ const catalogSql = `
         ) ORDER BY p.id) FROM paged p), '[]'::jsonb) AS items
 `;
 
+// '!' es el escape SQL explícito: los comodines del usuario son texto literal.
+function containsPattern(value: string | undefined): string | null {
+    return value === undefined ? null : `%${value.replace(/[!%_]/g, '!$&')}%`;
+}
+
 export function createPostgresCoursesRepository(poolFactory: () => Pool = createDatabasePool): CoursesRepository {
     let pool: Pool | undefined;
     return {
@@ -55,7 +60,7 @@ export function createPostgresCoursesRepository(poolFactory: () => Pool = create
             const offset = (BigInt(query.page) - 1n) * BigInt(query.pageSize);
             pool ??= poolFactory();
             const result = await pool.query<{ total_records: string; items: CourseRecord[] }>(catalogSql, [
-                query.platform ?? null, query.isPaid ?? null, query.skillName ?? null,
+                containsPattern(query.platform), query.isPaid ?? null, containsPattern(query.skillName),
                 query.pageSize, offset.toString(),
             ]);
             const row = result.rows[0];

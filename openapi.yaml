@@ -207,8 +207,8 @@ paths:
           name: platform
           required: false
           description: |
-            Filtro propuesto por courses.platform. Coincidencia exacta sensible
-            a mayúsculas, sin normalización ni recorte implícito de espacios.
+            Filtro por courses.platform. Coincidencia parcial insensible a mayúsculas.
+            %, _ y ! son literales; sin normalizar acentos ni recortar espacios.
             No se limita a una lista de plataformas que aún no se ha acordado.
           schema:
             type: string
@@ -229,8 +229,8 @@ paths:
           required: false
           description: |
             Filtro propuesto por skills.name mediante course_skills.
-            Una sola habilidad, coincidencia exacta sensible a mayúsculas,
-            sin normalización ni recorte implícito de espacios.
+            Coincidencia parcial insensible a mayúsculas sobre el nombre de habilidad.
+            %, _ y ! son literales; sin normalizar acentos ni recortar espacios.
             Una habilidad sin coincidencias devuelve una página sin cursos.
             No presupone un endpoint de habilidades ni un catálogo de sinónimos.
           schema:

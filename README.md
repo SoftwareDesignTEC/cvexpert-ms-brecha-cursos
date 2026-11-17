@@ -98,9 +98,17 @@ un parámetro de orden configurable ni paginación por cursor en este borrador.
 
 | Filtro opcional propuesto | Respaldo en el modelo | Semántica propuesta |
 | --- | --- | --- |
-| `platform` | `courses.platform` | Coincidencia exacta sensible a mayúsculas, sin recortar o normalizar el valor. |
+| `platform` | `courses.platform` | Coincidencia parcial insensible a mayúsculas (ILIKE), sin recortar espacios. |
 | `isPaid` | `courses.is_paid` | Literal `true` o `false`; omitirlo incluye ambos. |
-| `skillName` | `skills.name` y `course_skills` | Una habilidad por nombre exacto sensible a mayúsculas. No requiere otro endpoint para resolver IDs. |
+| `skillName` | `skills.name` y `course_skills` | Coincidencia parcial insensible a mayúsculas sobre el nombre de habilidad, mediante EXISTS. |
+
+La búsqueda parcial usa parámetros con porcentajes exteriores y escapa los caracteres
+SQL %, _ y ! (escape explícito), tratándolos como texto literal. Se aplica al
+catálogo completo antes de paginar y contar. Por ejemplo, micro y MICRO encuentran
+Microsoft Learn; git también coincide con GitHub. No se añaden equivalencias
+semánticas ni normalización de acentos: ILIKE conserva las diferencias de acentos
+según la configuración de PostgreSQL. No se requiere unaccent ni dependencias nuevas.
+El matching de brechas y recomendaciones por oferta conserva sus reglas exactas.
 
 Los filtros se combinan con AND. Se propone rechazar con HTTP 400 parámetros
 reconocidos repetidos, objetos, arreglos, vacíos o solo espacios; en paginación
@@ -126,8 +134,7 @@ validación de clientes antes de activar; ver [compatibilidad](docs/skills-gap-h
 
 ### Decisiones para consultar al equipo
 
-1. ¿Se aprueban los filtros propuestos y su coincidencia exacta, o existe una
-   necesidad confirmada de búsqueda parcial o normalización?
+1. El catálogo permite búsqueda parcial por plataforma y habilidad, insensible a mayúsculas.
 2. ¿Se aprueba la cadena decimal como ID público, y cómo se coordinará la
    identidad de cursos entre catálogo y recomendaciones futuras?
 3. ¿Se aprueban `durationHours: null` y los campos `isPaid`/`skills` en el catálogo?
