@@ -69,11 +69,11 @@ test('GET /courses con PostgreSQL real y rol exclusivamente SELECT', async t => 
                 }
             });
 
-            await t.test('filtros individuales exactos, desconocidos ignorados y combinaciones AND', async () => {
+            await t.test('filtros exactos y parciales sin distinguir mayúsculas, desconocidos y AND', async () => {
                 for (const [query, ids] of [
-                    ['platform=Alpha', ['2', '10', '30']], ['platform=alpha', []], ['platform=%20Alpha%20', []],
+                    ['platform=Alpha', ['2', '10', '30']], ['platform=alpha', ['2', '10', '30']], ['platform=LPH', ['2', '10', '30']], ['platform=%20Alpha%20', []],
                     ['isPaid=true', ['10']], ['isPaid=false', ['2', '20', '30']],
-                    ['skillName=SQL', ['10', '20']], ['skillName=sql', []], ['skillName=Missing', []],
+                    ['skillName=SQL', ['10', '20']], ['skillName=sql', ['10', '20']], ['skillName=ype', ['10', '30']], ['skillName=Missing', []],
                     ['platform=Alpha&isPaid=true&skillName=SQL', ['10']],
                     ['platform=Alpha&isPaid=false&skillName=SQL', []],
                     ['platform=Alpha&isPaid=false&skillName=TypeScript', ['30']], ['unknown=value', ['2', '10', '20', '30']],
@@ -100,7 +100,7 @@ test('GET /courses con PostgreSQL real y rol exclusivamente SELECT', async t => 
                 }
                 assert.deepEqual((await getPage('?page=2')).items, []);
                 assert.equal((await getPage('?pageSize=1')).page, 1);
-                const filtered = await getPage('?skillName=SQL&page=3&pageSize=1');
+                const filtered = await getPage('?skillName=sq&page=3&pageSize=1');
                 assert.deepEqual(filtered.items, []);
                 assert.equal(filtered.totalRecords, 2);
             });
@@ -115,7 +115,7 @@ test('GET /courses con PostgreSQL real y rol exclusivamente SELECT', async t => 
 
             await t.test('inyección SQL y comodines son valores literales sin modificar el catálogo', async () => {
                 for (const filter of ['platform', 'skillName']) {
-                    for (const attack of ["' OR TRUE --", "'; DROP TABLE public.courses; --", '%', '_']) {
+                    for (const attack of ["' OR TRUE --", "'; DROP TABLE public.courses; --", '%', '_', '!', '\\']) {
                         const body = await getPage(`?${new URLSearchParams({ [filter]: attack })}`);
                         assert.deepEqual(body.items, []);
                         assert.equal(body.totalRecords, 0);

@@ -63,7 +63,7 @@ test('repository: binds SQL inputs and computes huge offset without rounding', a
     const pool = { async query(sql: string, values: unknown[]) {
         calls++;
         assert.ok(!sql.includes(attack));
-        assert.deepEqual(values, [attack, false, attack, 100, '900719925474099000']);
+        assert.deepEqual(values, [`%${attack}%`, false, `%${attack}%`, 100, '900719925474099000']);
         return { rows: [{ items: [], total_records: '3' }] };
     } } as unknown as Pool;
     const repository = createPostgresCoursesRepository(() => pool);
@@ -101,4 +101,47 @@ test('pool is lazy; health and skills-gap survive configuration/connection error
         assert.equal((await fetch(`${url}/skills-gap`)).status, 401);
         assert.equal((await fetch(`${url}/courses`)).status, 503);
     });
+});
+
+// Contrato SQL sin conectar a PostgreSQL: filtros parametrizados antes de LIMIT,
+// EXISTS evita duplicar cursos y el conteo comparte el conjunto completo filtrado.
+test('repository: partial catalog filters preserve SQL pagination and literal characters', async t => {
+    for (const [name, filters, expected] of [
+        ['exact platform', { platform: 'Microsoft Learn' }, ['%Microsoft Learn%', null, null]],
+        ['partial platform', { platform: 'micro' }, ['%micro%', null, null]],
+        ['uppercase platform', { platform: 'MICRO' }, ['%MICRO%', null, null]],
+        ['Coursera substring', { platform: 'cour' }, ['%cour%', null, null]],
+        ['exact skill', { skillName: 'Python' }, [null, null, '%Python%']],
+        ['lowercase skill', { skillName: 'python' }, [null, null, '%python%']],
+        ['partial Python skill', { skillName: 'pyth' }, [null, null, '%pyth%']],
+        ['partial skill including GitHub', { skillName: 'git' }, [null, null, '%git%']],
+        ['AND filters and exact false', { platform: 'micro', isPaid: false, skillName: 'git' }, ['%micro%', false, '%git%']],
+        ['exact true', { isPaid: true }, [null, true, null]],
+        ['literal SQL wildcards and escape', { platform: '100%_!\\', skillName: '%_!\\' }, ['%100!%!_!!\\%', null, '%!%!_!!\\%']],
+        ['no filters', {}, [null, null, null]],
+    ] as const) {
+        await t.test(name, async () => {
+            const pool = { async query(sql: string, values: unknown[]) {
+                assert.deepEqual(values, [...expected, 8, '8']);
+                assert.match(sql, /c\.platform ILIKE \$1 ESCAPE '!'/);
+                assert.match(sql, /s\.name ILIKE \$3 ESCAPE '!'/);
+                assert.match(sql, /AND \(\$2::boolean IS NULL OR c\.is_paid = \$2\)/);
+                assert.match(sql, /AND \(\$3::text IS NULL OR EXISTS/);
+                assert.match(sql, /SELECT \* FROM filtered ORDER BY id ASC LIMIT \$4::integer OFFSET \$5::bigint/);
+                assert.match(sql, /SELECT count\(\*\)::text FROM filtered/);
+                return { rows: [{ items: [], total_records: '19' }] };
+            } } as unknown as Pool;
+            const repository = createPostgresCoursesRepository(() => pool);
+            assert.deepEqual(await repository.findPage({ page: 2, pageSize: 8, ...filters }), { items: [], totalRecords: 19 });
+        });
+    }
+});
+
+test('repository: no matches and pages beyond filtered results retain the full total', async () => {
+    for (const total of ['0', '17']) {
+        const pool = { async query() { return { rows: [{ items: [], total_records: total }] }; } } as unknown as Pool;
+        const service = createCoursesService(createPostgresCoursesRepository(() => pool));
+        assert.deepEqual(await service.getPage({ platform: 'micro', page: 4, pageSize: 8 }),
+            { items: [], page: 4, pageSize: 8, totalRecords: Number(total) });
+    }
 });
